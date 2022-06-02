@@ -1,0 +1,7 @@
+{
+    "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
+    "integration_type": "orchestrator",
+    "name": "BoschIPcamera",
+    "status": "Prototype",
+    "description": "Bosch IP Camera Orchestrator for Add, Remove and Inventory."
+}
