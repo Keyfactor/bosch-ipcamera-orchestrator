@@ -1,5 +1,4 @@
 ﻿using Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client;
-using Keyfactor.Extensions.Orchestrator.GcpCertManager;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
@@ -123,7 +122,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
                 _logger.MethodEntry(LogLevel.Debug);
                 _logger.LogTrace($"Reenrollment Config {JsonConvert.SerializeObject(jobConfiguration)}");
-                _logger.LogTrace($"Reenrollment CSR Config {JsonConvert.SerializeObject(submitReenrollmentUpdate)}");
 
                 BoschIPcameraClient client = new BoschIPcameraClient();
 
@@ -150,7 +148,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             }
             catch (Exception e)
             {
-                _logger.LogError($"PerformInventory Error: {e.Message}");
+                _logger.LogError($"PerformReenrollment Error: {e.Message}");
                 throw;
             }
             

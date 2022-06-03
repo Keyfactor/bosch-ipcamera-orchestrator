@@ -13,7 +13,7 @@ using System.Text;
 using System.IO;
 using System.Net.Http;
 
-namespace GcpCertManagerTestConsole
+namespace BoschIPCameraTestConsole
 {
     struct enrollResponse
     {
@@ -114,14 +114,29 @@ namespace GcpCertManagerTestConsole
             ILogger<BoschIPcameraClient> invLogger = invLoggerFactory.CreateLogger<BoschIPcameraClient>();
 
             BoschIPcameraClient client = new BoschIPcameraClient();
+            String returnCode = null;
 
             //generate the CSR on the camera
-           client.setupStandardBoschIPcameraClient("172.78.231.174:44130", "mizell", "Keyfactor1!");
-           client.certCreate("keyfactor");
+            client.setupStandardBoschIPcameraClient("172.78.231.174:44130", "mizell", "Keyfactor1!");
+           // returnCode = client.certCreate("keyfactor");
 
-            //get the CSR from the camera
-           string responseContent = client.downloadCSRFromCamera("172.78.231.174:44130", "mizell", "Keyfactor1!", "keyfactor");
-            */
+            if (returnCode != "fail")
+            {
+                //get the CSR from the camera
+            //    string responseContent = client.downloadCSRFromCamera("172.78.231.174:44130", "mizell", "Keyfactor1!", "keyfactor");
+            }
+
+            //upload the cert
+
+            //turn on 802.1x
+            returnCode = client.change8021xSettings("1");
+
+            if (returnCode != "fail")
+            {
+                //set cert usage
+
+                //reboot camera
+            }
         }
 
         public static bool GetItems(IEnumerable<CurrentInventoryItem> items)
