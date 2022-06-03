@@ -55,5 +55,14 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             string hexValue = String.Format("{1,1:X}", 0, stringLength);
             return hexValue.PadLeft(padValue, padChar);
         }
+
+        //take the passed in string's length + 4 --> convert to hex left pad with padChar with provided padValue
+        public static string ToHex(string myString, int padValue, char padChar)
+        {
+            //get the length and add 4
+            int stringLength = myString.Length + 4;
+            string hexValue = String.Format("{1,1:X}", 0, stringLength);
+            return hexValue.PadLeft(padValue, padChar);
+        }
     }
 }

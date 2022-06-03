@@ -234,6 +234,67 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         }
 
+        //set the cert usage on a cert
+        //this is done in two steps - first reset for the usage type then set for the cert name
+        public string setCertUsage(string certName, string usageCode)
+        {
+            //_logger.LogTrace("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL);
+            String payload = "0x00080000" + usageCode;
+            string myId = HexadecimalEncoding.ToHexNoPadding(certName);
+            string additionalPayload = payload + HexadecimalEncoding.ToHex(certName, 4, '0') + "0001" + myId;
+
+            try
+            {
+                //first reset the cert usage
+                setCertUsage(payload).Wait();
+                String returnCode = parseCameraResponse(_response.Content);
+                if (returnCode != null)
+                {
+                    // _logger.LogError("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL " failed with error code " + returnCode);
+                    return "fail";
+                } 
+                else
+                {
+                    //now set the cert usage for the actual cert
+                    setCertUsage(additionalPayload).Wait();
+                    returnCode = parseCameraResponse(_response.Content);
+                    if (returnCode != null)
+                    {
+                        // _logger.LogError("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL " failed with error code " + returnCode);
+                        return "fail";
+                    }
+
+                }
+                return "pass";
+                // _logger.LogInformation("Successfully changed cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL);
+            }
+            catch (Exception ex)
+            {
+                //_logger.LogError("Cert usage change failed with the following error: " + ex.ToString());
+            };
+
+            return "fail";
+        }
+
+        //can be used to reset/clear existing cert usage and to set cert usage on a specific cert
+        private async Task setCertUsage(string payload)
+        {
+            CancellationTokenSource source = new CancellationTokenSource();
+            CancellationToken token = source.Token;
+
+            var request = new RestRequest()
+                .AddQueryParameter("command", "0x0BF2")
+                .AddQueryParameter("type", "P_OCTET")
+                .AddQueryParameter("direction", "WRITE")
+                .AddQueryParameter("num", "1")
+                .AddQueryParameter("payload", payload);
+
+            string requestValue = request.Resource;
+
+            _response = await _client.GetAsync(request, token);
+
+        }
+
         //returns error code if camera call fails, blank if successful
         private string parseCameraResponse(String response)
         {
