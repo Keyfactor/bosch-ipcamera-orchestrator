@@ -11,6 +11,7 @@ using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Threading;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
@@ -41,6 +42,70 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         private readonly ILogger<Reenrollment> _logger;
 
         // Perform web request with templated structure of returned data. Optionally performs HTTPS request without verifying server certificate.
+        private void Upload(string host, string fileName, string fileData)
+        {
+            
+            string boundary = "----------" + DateTime.Now.Ticks.ToString("x");
+            string fileHeader = string.Format("Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{0}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n", fileName);
+            HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
+            CredentialCache credCache = new CredentialCache();
+            credCache.Add(new Uri("http://" + host), "Digest", new NetworkCredential("mizell", "Keyfactor1!"));
+            httpWebRequest.Credentials = credCache;
+            httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
+            httpWebRequest.Method = "POST";
+            var x = httpWebRequest.BeginGetRequestStream((result) =>
+            {
+                try
+                {
+                    HttpWebRequest request = (HttpWebRequest)result.AsyncState;
+                    using (Stream requestStream = request.EndGetRequestStream(result))
+                    {
+                        WriteToStream(requestStream, "--" + boundary + "\r\n");
+                        _logger.LogDebug(fileHeader);
+                        WriteToStream(requestStream, fileHeader);
+                        _logger.LogDebug(fileData);
+                        WriteToStream(requestStream, fileData);
+                        WriteToStream(requestStream, "\r\n--" + boundary + "--\r\n");
+                    }
+                    request.BeginGetResponse(a =>
+                    {
+                        try
+                        {
+                            var response = request.EndGetResponse(a);
+                            var responseStream = response.GetResponseStream();
+                            using (var sr = new StreamReader(responseStream))
+                            {
+                                using (StreamReader streamReader = new StreamReader(response.GetResponseStream()))
+                                {
+                                    string responseString = streamReader.ReadToEnd();
+                                }
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e.Message);
+                            throw;
+                        }
+                    }, null);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                    throw;
+                }
+            }, httpWebRequest);
+            while (!x.IsCompleted)
+            {
+                Thread.Sleep(100);
+            }
+        }
+
+        private static void WriteToStream(Stream s, string txt)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(txt);
+            s.Write(bytes, 0, bytes.Length);
+        }
+
         private static T MakeWebRequest<T>(string url, string user, string pass, string bodyStr, string method = "POST", bool skipCertCheck=false)
         {
             if (skipCertCheck)
@@ -131,11 +196,17 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 client.setupStandardBoschIPcameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
                     jobConfiguration.ServerPassword);
                 client.certCreate("keyfactor");
-
+                
                 //get the CSR from the camera
                 string responseContent = client.downloadCSRFromCamera(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
                     jobConfiguration.ServerPassword, "keyfactor");
 
+                string body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"Keyfactor.thedemodrive.com\\\\Keyfactor Demo Drive CA 1\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"DDThinClient\"}}";
+                enrollResponse resp = MakeWebRequest<enrollResponse>("bosch.thedemodrive.com/KeyfactorAPI/Enrollment/CSR", "THEDEMODRIVE\\Kilgallin", "GJRGes8RF2wsZdau", body, skipCertCheck: true);
+                string cert = resp.CertificateInformation.Certificates[0];
+                cert = cert.Substring(cert.IndexOf("-----"));
+                _logger.LogDebug(cert);
+                Upload("172.78.231.174:44130", "orchestratedCert.cer", cert);
 
                 return new JobResult
                 {

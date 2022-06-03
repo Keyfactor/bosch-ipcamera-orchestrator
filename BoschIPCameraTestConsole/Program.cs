@@ -107,9 +107,9 @@ namespace BoschIPCameraTestConsole
             string CSR = "-----BEGIN CERTIFICATE REQUEST-----MIICbTCCAVUCAQAwKjELMAkGA1UEAxMCdDIxGzAZBgNVBAUTEjA5NDY4ODQzMTA2NTE2MDAyMDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAN+dDhcIjZktRRw3Oz0ztLjv4USn1aBgu4T/RjUPIHpPO1mm0W075xfECISr95bn5QLSITrrHvu3iqa/t1qDVcDzbfQc2GhWZrP1yRR7n5C8yh2VpAk7GR5WkzOwakeSOuqlWnLIMIjKWRXi0Yd6gKlHbx2F57TfwIVrrVaW048BzwfGWcpsHK5weqJVi6Oq8aDIwELCnVb72vQTJOpiVsKXi4acOqU2P/0c5+Ke+jLnJPfoVQ6T9TO2HOwBBJQQj287BniJ+/wS3NigGHe8IzLGhTlIOxW+lnIDr/L1IRrqg0TLHmiOeXDrZ1u3NayOQY6IxbEYeNzYAZpL9u6TMgkCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAWynB+eRuit1RrDrImKLFLOklfHGk4vvRE/s7gklrkx4aaZ/FzP1sJM4AbuMynNd0VMGmtDQAR+HARkEWkkOp79JXwBPbDs3TwMTqrguK03pHvZ5AYbYaifWS541M3qacDu4BcMoHEjTszwCtZku5667XNkLq0ltOhHPNBOGhI0G4BusaZcvs9m81nV3DVdJXkRezL28Fd7MtEtbyhAZG0oHmU7d6wvfs11UmgGd2mfiogHC2/2Wg8kKipjFN7E6r5npAMD/IK0RQ9AZzCyq9TMqxfnvtpEDc+f1FOcxpPwZxRVQrY5AQfyadR0ehpCLVxYvdWL184xo46rPrYXTgWg==-----END CERTIFICATE REQUEST-----";
             string body = $"{{\"CSR\": \"{CSR}\",\"CertificateAuthority\": \"KFTrain.keyfactor.lab\\\\keyfactor-KFTRAIN-CA\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{templateName}\"}}";
             enrollResponse resp = MakeWebRequest<enrollResponse>("192.168.78.138/KeyfactorAPI/Enrollment/CSR", "KEYFACTOR\\Administrator", "Password1", body);
-            Console.WriteLine(resp);*/
+            Console.WriteLine(resp);
             //Console.ReadLine();
-            /*
+            
             ILoggerFactory invLoggerFactory = new LoggerFactory();
             ILogger<BoschIPcameraClient> invLogger = invLoggerFactory.CreateLogger<BoschIPcameraClient>();
 
@@ -137,6 +137,7 @@ namespace BoschIPCameraTestConsole
 
                 //reboot camera
             }
+            */
         }
 
         public static bool GetItems(IEnumerable<CurrentInventoryItem> items)
