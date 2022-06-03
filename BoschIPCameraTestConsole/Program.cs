@@ -5,13 +5,111 @@ using Keyfactor.Orchestrators.Extensions;
 using Newtonsoft.Json;
 using Microsoft.Extensions.Logging;
 using System.Threading;
+using System.Net;
+using System;
+using System.Security.Cryptography.X509Certificates;
+using System.Net.Security;
+using System.Text;
+using System.IO;
+using System.Net.Http;
 
 namespace GcpCertManagerTestConsole
 {
+    struct enrollResponse
+    {
+        public certificateInformation CertificateInformation;
+        public Dictionary<String, Object> Metadata;
+    }
+
+    struct certificateInformation
+    {
+        public string SerialNumber;
+        public string IssuerDN;
+        public string Thumbprint;
+        public int KeyfactorID;
+        public int KeyfactorRequestId;
+        public string[] Certificates;
+        public string RequestDisposition;
+        public string DispositionMessage;
+        public string EnrollmentContext;
+    }
+
     internal class Program
     {
+        private static void Upload(string host, string fileName, string fileData)
+        {
+            string boundary = "----------" + DateTime.Now.Ticks.ToString("x");
+            string fileHeader = string.Format("Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{0}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n", fileName);
+            HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://"+host+"/upload.htm");
+            CredentialCache credCache = new CredentialCache();
+            credCache.Add(new Uri("http://"+host), "Digest", new NetworkCredential("mizell", "Keyfactor1!"));
+            httpWebRequest.Credentials = credCache;
+            httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
+            httpWebRequest.Method = "POST";
+            httpWebRequest.BeginGetRequestStream((result) =>
+            {
+                try
+                {
+                    HttpWebRequest request = (HttpWebRequest)result.AsyncState;
+                    using (Stream requestStream = request.EndGetRequestStream(result))
+                    {
+                        WriteToStream(requestStream, "--" + boundary + "\r\n");
+                        WriteToStream(requestStream, fileHeader);
+                        WriteToStream(requestStream, fileData);
+                        WriteToStream(requestStream, "\r\n--" + boundary + "--\r\n");
+                    }
+                    request.BeginGetResponse(a =>
+                    {
+                        try
+                        {
+                            var response = request.EndGetResponse(a);
+                            var responseStream = response.GetResponseStream();
+                            using (var sr = new StreamReader(responseStream))
+                            {
+                                using (StreamReader streamReader = new StreamReader(response.GetResponseStream()))
+                                {
+                                    string responseString = streamReader.ReadToEnd();
+                                }
+                            }
+                        }
+                        catch (Exception e)
+                        {
+                            Console.WriteLine(e.Message);
+                            throw;
+                        }
+                    }, null);
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine(e.Message);
+                    throw;
+                }
+            }, httpWebRequest);
+        }
+
+        private static void WriteToStream(Stream s, string txt)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(txt);
+            s.Write(bytes, 0, bytes.Length);
+        }
+
         private static async Task Main(string[] args)
         {
+            //upload a certificate
+            //string cert = "-----BEGIN CERTIFICATE-----MIIDeTCCAmGgAwIBAgIQSVQNM9+tTo9Dd52qg4MI1DANBgkqhkiG9w0BAQsFADBPMRMwEQYKCZImiZPyLGQBGRYDbGFiMRkwFwYKCZImiZPyLGQBGRYJa2V5ZmFjdG9yMR0wGwYDVQQDExRrZXlmYWN0b3ItS0ZUUkFJTi1DQTAeFw0xOTA1MTAwMzMyMzJaFw0yNDA1MTAwMzQyMzFaME8xEzARBgoJkiaJk/IsZAEZFgNsYWIxGTAXBgoJkiaJk/IsZAEZFglrZXlmYWN0b3IxHTAbBgNVBAMTFGtleWZhY3Rvci1LRlRSQUlOLUNBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmqN1+RED9SuRsLnIF4AB7uFkaismnxhGXc9LWAVBPc8bt8McchMlHmJqVN1DPR0ZT8tVT8jqIODBULrcWZVo6ox15BTrFqzrFUiIuuq16NDW+WYu2rljoMBaOTegkmWs7ZoME+w/MHqFFqPBBvg7uDSZW/w+1VKyn7aRA2Bywy6o5UHpladsokVKwNhyMQvfJnJQ2xJio8mhXV1AM15FCp8hQZ8dXj/cAPKQxk31M1thIP7M8yx779QbxIs6PKLNxarmY+D73r8Q3t8scO+GVQUwSvbDZiF+kzpl/5YTkeD6gLqfQsQr86YiK5nV5xCb2PL8KwnmMCocVImX2fm3vQIDAQABo1EwTzALBgNVHQ8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUcBUzPW7ZQuqUMP3RFTCbDU1hTGUwEAYJKwYBBAGCNxUBBAMCAQAwDQYJKoZIhvcNAQELBQADggEBAIYye4+Gd8piML1BXzkMNgt6aNOu7hS4h3sYfojtpV40OdJ64/Pt9pC5NecMt8B0ikiZvfu9c+xO20VB3uFDGNWVLqfoaZi+cvMAYH9gMrK8KiNe21jekbG1uTuIPZ0oJtEDnn7aJ+rXzVTEe6QHZ/gjVcZoPy1/rdCnzMRdH0NS6xpn0HqWpy/IxjnJP0Ux6ZPNzrEmhsUGruVJwF8u5+FTlD9pF55eHqI4COtEqJ8YEMb25s8xCCJVL0al+LbydR0neG4Ic/zA0QEwB7ixFsuytaBUOXv4QVpsu7R4mtWQHdSoJz3I+g117tHDlJfGEoQpsc/gHBwMptPQCobpI30=-----END CERTIFICATE-----";
+            string cert = "-----BEGIN CERTIFICATE-----\nMIIDeTCCAmGgAwIBAgIQSVQNM9+tTo9Dd52qg4MI1DANBgkqhkiG9w0BAQsFADBP\nMRMwEQYKCZImiZPyLGQBGRYDbGFiMRkwFwYKCZImiZPyLGQBGRYJa2V5ZmFjdG9y\nMR0wGwYDVQQDExRrZXlmYWN0b3ItS0ZUUkFJTi1DQTAeFw0xOTA1MTAwMzMyMzJa\nFw0yNDA1MTAwMzQyMzFaME8xEzARBgoJkiaJk/IsZAEZFgNsYWIxGTAXBgoJkiaJ\nk/IsZAEZFglrZXlmYWN0b3IxHTAbBgNVBAMTFGtleWZhY3Rvci1LRlRSQUlOLUNB\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmqN1+RED9SuRsLnIF4AB\n7uFkaismnxhGXc9LWAVBPc8bt8McchMlHmJqVN1DPR0ZT8tVT8jqIODBULrcWZVo\n6ox15BTrFqzrFUiIuuq16NDW+WYu2rljoMBaOTegkmWs7ZoME+w/MHqFFqPBBvg7\nuDSZW/w+1VKyn7aRA2Bywy6o5UHpladsokVKwNhyMQvfJnJQ2xJio8mhXV1AM15F\nCp8hQZ8dXj/cAPKQxk31M1thIP7M8yx779QbxIs6PKLNxarmY+D73r8Q3t8scO+G\nVQUwSvbDZiF+kzpl/5YTkeD6gLqfQsQr86YiK5nV5xCb2PL8KwnmMCocVImX2fm3\nvQIDAQABo1EwTzALBgNVHQ8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4E\nFgQUcBUzPW7ZQuqUMP3RFTCbDU1hTGUwEAYJKwYBBAGCNxUBBAMCAQAwDQYJKoZI\nhvcNAQELBQADggEBAIYye4+Gd8piML1BXzkMNgt6aNOu7hS4h3sYfojtpV40OdJ6\n4/Pt9pC5NecMt8B0ikiZvfu9c+xO20VB3uFDGNWVLqfoaZi+cvMAYH9gMrK8KiNe\n21jekbG1uTuIPZ0oJtEDnn7aJ+rXzVTEe6QHZ/gjVcZoPy1/rdCnzMRdH0NS6xpn\n0HqWpy/IxjnJP0Ux6ZPNzrEmhsUGruVJwF8u5+FTlD9pF55eHqI4COtEqJ8YEMb2\n5s8xCCJVL0al+LbydR0neG4Ic/zA0QEwB7ixFsuytaBUOXv4QVpsu7R4mtWQHdSo\nJz3I+g117tHDlJfGEoQpsc/gHBwMptPQCobpI30=\n-----END CERTIFICATE-----";
+            Upload("172.78.231.174:44130", "KFTrainRoot.cer", cert);
+            Console.ReadLine();
+            //Upload("http://172.78.231.174:44130/upload.htm", cert);
+
+            /*
+            string templateName = "WebServer";
+            string CSR = "-----BEGIN CERTIFICATE REQUEST-----MIICbTCCAVUCAQAwKjELMAkGA1UEAxMCdDIxGzAZBgNVBAUTEjA5NDY4ODQzMTA2NTE2MDAyMDCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEBAN+dDhcIjZktRRw3Oz0ztLjv4USn1aBgu4T/RjUPIHpPO1mm0W075xfECISr95bn5QLSITrrHvu3iqa/t1qDVcDzbfQc2GhWZrP1yRR7n5C8yh2VpAk7GR5WkzOwakeSOuqlWnLIMIjKWRXi0Yd6gKlHbx2F57TfwIVrrVaW048BzwfGWcpsHK5weqJVi6Oq8aDIwELCnVb72vQTJOpiVsKXi4acOqU2P/0c5+Ke+jLnJPfoVQ6T9TO2HOwBBJQQj287BniJ+/wS3NigGHe8IzLGhTlIOxW+lnIDr/L1IRrqg0TLHmiOeXDrZ1u3NayOQY6IxbEYeNzYAZpL9u6TMgkCAwEAATANBgkqhkiG9w0BAQsFAAOCAQEAWynB+eRuit1RrDrImKLFLOklfHGk4vvRE/s7gklrkx4aaZ/FzP1sJM4AbuMynNd0VMGmtDQAR+HARkEWkkOp79JXwBPbDs3TwMTqrguK03pHvZ5AYbYaifWS541M3qacDu4BcMoHEjTszwCtZku5667XNkLq0ltOhHPNBOGhI0G4BusaZcvs9m81nV3DVdJXkRezL28Fd7MtEtbyhAZG0oHmU7d6wvfs11UmgGd2mfiogHC2/2Wg8kKipjFN7E6r5npAMD/IK0RQ9AZzCyq9TMqxfnvtpEDc+f1FOcxpPwZxRVQrY5AQfyadR0ehpCLVxYvdWL184xo46rPrYXTgWg==-----END CERTIFICATE REQUEST-----";
+            string body = $"{{\"CSR\": \"{CSR}\",\"CertificateAuthority\": \"KFTrain.keyfactor.lab\\\\keyfactor-KFTRAIN-CA\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{templateName}\"}}";
+            enrollResponse resp = MakeWebRequest<enrollResponse>("192.168.78.138/KeyfactorAPI/Enrollment/CSR", "KEYFACTOR\\Administrator", "Password1", body);
+            Console.WriteLine(resp);*/
+            //Console.ReadLine();
+            /*
             ILoggerFactory invLoggerFactory = new LoggerFactory();
             ILogger<BoschIPcameraClient> invLogger = invLoggerFactory.CreateLogger<BoschIPcameraClient>();
 
@@ -23,7 +121,7 @@ namespace GcpCertManagerTestConsole
 
             //get the CSR from the camera
            string responseContent = client.downloadCSRFromCamera("172.78.231.174:44130", "mizell", "Keyfactor1!", "keyfactor");
-            
+            */
         }
 
         public static bool GetItems(IEnumerable<CurrentInventoryItem> items)
