@@ -295,6 +295,53 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         }
 
+        //Delete the cert by name
+        public string deleteCertByName(string certName)
+        {
+            //_logger.LogTrace("Delete cert " + certName + " for camera " + _cameraURL);
+            string myId = HexadecimalEncoding.ToHexNoPadding(certName);
+            string payload = HexadecimalEncoding.ToHexWithPrefix(certName, 4, '0') + "0000" + myId + "0004000200080003000000FF";
+
+            try
+            {
+                //first reset the cert usage
+                deleteCert(payload).Wait();
+                String returnCode = parseCameraResponse(_response.Content);
+                if (returnCode != null)
+                {
+                    // _logger.LogError("Deleting cert " + certName + " for camera " + _cameraURL " failed with error code " + returnCode);
+                    return "fail";
+                }
+                return "pass";
+                // _logger.LogInformation("Successfully deleted cert " + certName + " for camera " + _cameraURL);
+            }
+            catch (Exception ex)
+            {
+                //_logger.LogError("Deleting cert failed with the following error: " + ex.ToString());
+            };
+
+            return "fail";
+        }
+
+        //delete a cert on camera
+        private async Task deleteCert(string payload)
+        {
+            CancellationTokenSource source = new CancellationTokenSource();
+            CancellationToken token = source.Token;
+
+            var request = new RestRequest()
+                .AddQueryParameter("command", "0x0BE9")
+                .AddQueryParameter("type", "P_OCTET")
+                .AddQueryParameter("direction", "WRITE")
+                .AddQueryParameter("num", "1")
+                .AddQueryParameter("payload", payload);
+
+            string requestValue = request.Resource;
+
+            _response = await _client.GetAsync(request, token);
+
+        }
+
         //returns error code if camera call fails, blank if successful
         private string parseCameraResponse(String response)
         {

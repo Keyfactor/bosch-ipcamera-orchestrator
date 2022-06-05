@@ -118,6 +118,10 @@ namespace BoschIPCameraTestConsole
 
             //generate the CSR on the camera
             client.setupStandardBoschIPcameraClient("172.78.231.174:44130", "mizell", "Keyfactor1!");
+
+            //delete cert if it exists
+            returnCode = client.deleteCertByName("keyfactor");
+
          //   returnCode = client.certCreate("keyfactor");
 
             if (returnCode != "fail")
@@ -134,11 +138,12 @@ namespace BoschIPCameraTestConsole
             if (returnCode != "fail")
             {
                 //set cert usage
-                returnCode = client.setCertUsage("keyfactor", "00000001");
+              //  returnCode = client.setCertUsage("keyfactor", "00000001");
 
                 if (returnCode != "fail")
                 {
                     //reboot camera
+              //      returnCode = client.rebootCamera();
                 }
             }
 
