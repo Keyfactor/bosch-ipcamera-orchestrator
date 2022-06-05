@@ -36,20 +36,36 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         public string EnrollmentContext;
     }
 
+    struct boschIPCameraDetails
+    {
+        public string CN;
+        public string SN;
+        public string country;
+        public string state;
+        public string city;
+        public string org;
+        public string OU;
+        public string CA;
+        public string template;
+        public string keyfactorHost;
+        public string keyfactorUser;
+        public string keyfactorPass;
+    }
+
     public class Reenrollment : IReenrollmentJobExtension
     {
         public string ExtensionName => "BoschIPCamera";
         private readonly ILogger<Reenrollment> _logger;
 
         // Perform web request with templated structure of returned data. Optionally performs HTTPS request without verifying server certificate.
-        private void Upload(string host, string fileName, string fileData)
+        private void Upload(string host, string username, string password, string fileName, string fileData)
         {
             
             string boundary = "----------" + DateTime.Now.Ticks.ToString("x");
             string fileHeader = string.Format("Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{0}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n", fileName);
             HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
             CredentialCache credCache = new CredentialCache();
-            credCache.Add(new Uri("http://" + host), "Digest", new NetworkCredential("mizell", "Keyfactor1!"));
+            credCache.Add(new Uri("http://" + host), "Digest", new NetworkCredential(username, password));
             httpWebRequest.Credentials = credCache;
             httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
             httpWebRequest.Method = "POST";
@@ -187,7 +203,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
                 _logger.MethodEntry(LogLevel.Debug);
                 _logger.LogTrace($"Reenrollment Config {JsonConvert.SerializeObject(jobConfiguration)}");
-
+                boschIPCameraDetails storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
                 BoschIPcameraClient client = new BoschIPcameraClient();
 
                 //need to parse the jobConfiguration for the cert details - create a map like in the BoschIPCamera class and pass it in
@@ -195,18 +211,18 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 //generate the CSR on the camera
                 client.setupStandardBoschIPcameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
                     jobConfiguration.ServerPassword);
-                client.certCreate("keyfactor");
+                client.certCreate(jobConfiguration.CertificateStoreDetails.StorePath);
                 
                 //get the CSR from the camera
                 string responseContent = client.downloadCSRFromCamera(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
-                    jobConfiguration.ServerPassword, "keyfactor");
-
-                string body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"Keyfactor.thedemodrive.com\\\\Keyfactor Demo Drive CA 1\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"DDThinClient\"}}";
-                enrollResponse resp = MakeWebRequest<enrollResponse>("bosch.thedemodrive.com/KeyfactorAPI/Enrollment/CSR", "THEDEMODRIVE\\Kilgallin", "GJRGes8RF2wsZdau", body, skipCertCheck: true);
+                    jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath);
+                _logger.LogDebug("Downloaded CSR: " + responseContent);
+                string body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"{storeProperties.CA}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{storeProperties.template}\"}}";
+                enrollResponse resp = MakeWebRequest<enrollResponse>(storeProperties.keyfactorHost+"/KeyfactorAPI/Enrollment/CSR", storeProperties.keyfactorUser, jobConfiguration.CertificateStoreDetails.StorePassword, body, skipCertCheck: true);
                 string cert = resp.CertificateInformation.Certificates[0];
                 cert = cert.Substring(cert.IndexOf("-----"));
                 _logger.LogDebug(cert);
-                Upload("172.78.231.174:44130", "orchestratedCert.cer", cert);
+                Upload(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername, jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath+".cer", cert);
 
                 return new JobResult
                 {

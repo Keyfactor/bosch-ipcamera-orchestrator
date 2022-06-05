@@ -107,11 +107,11 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             bool haveCSR = false;
             int count = 0;
             //keep trying until we get the cert or try 10 times (wait 20 seconds each time)
-            while (!haveCSR && count <= 10)
+            while (!haveCSR && count <= 30)
             {
                 try
                 {
-                    Thread.Sleep(20000);
+                    Thread.Sleep(5000);
                     count++;
                     downloadCSR(cameraHostURL, userName, password, certName).Wait();
                    // _logger.LogInformation("CSR downloaded successfully for " + certName);
