@@ -12,6 +12,7 @@ using System.Net.Security;
 using System.Text;
 using System.IO;
 using System.Net.Http;
+using Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs;
 
 namespace BoschIPCameraTestConsole
 {
@@ -34,15 +35,19 @@ namespace BoschIPCameraTestConsole
         public string EnrollmentContext;
     }
 
+
     internal class Program
     {
+
+        private static Dictionary<string, string> s_csrSubject = new Dictionary<string, string>();
+
         private static void Upload(string host, string fileName, string fileData)
         {
             string boundary = "----------" + DateTime.Now.Ticks.ToString("x");
             string fileHeader = string.Format("Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{0}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n", fileName);
             HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://"+host+"/upload.htm");
             CredentialCache credCache = new CredentialCache();
-            credCache.Add(new Uri("http://"+host), "Digest", new NetworkCredential("mizell", "Keyfactor1!"));
+            credCache.Add(new Uri("http://"+host), "Digest", new NetworkCredential("service", "DHStrp2022!"));
             httpWebRequest.Credentials = credCache;
             httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
             httpWebRequest.Method = "POST";
@@ -97,10 +102,10 @@ namespace BoschIPCameraTestConsole
         {
             //upload a certificate
             //string cert = "-----BEGIN CERTIFICATE-----MIIDeTCCAmGgAwIBAgIQSVQNM9+tTo9Dd52qg4MI1DANBgkqhkiG9w0BAQsFADBPMRMwEQYKCZImiZPyLGQBGRYDbGFiMRkwFwYKCZImiZPyLGQBGRYJa2V5ZmFjdG9yMR0wGwYDVQQDExRrZXlmYWN0b3ItS0ZUUkFJTi1DQTAeFw0xOTA1MTAwMzMyMzJaFw0yNDA1MTAwMzQyMzFaME8xEzARBgoJkiaJk/IsZAEZFgNsYWIxGTAXBgoJkiaJk/IsZAEZFglrZXlmYWN0b3IxHTAbBgNVBAMTFGtleWZhY3Rvci1LRlRSQUlOLUNBMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmqN1+RED9SuRsLnIF4AB7uFkaismnxhGXc9LWAVBPc8bt8McchMlHmJqVN1DPR0ZT8tVT8jqIODBULrcWZVo6ox15BTrFqzrFUiIuuq16NDW+WYu2rljoMBaOTegkmWs7ZoME+w/MHqFFqPBBvg7uDSZW/w+1VKyn7aRA2Bywy6o5UHpladsokVKwNhyMQvfJnJQ2xJio8mhXV1AM15FCp8hQZ8dXj/cAPKQxk31M1thIP7M8yx779QbxIs6PKLNxarmY+D73r8Q3t8scO+GVQUwSvbDZiF+kzpl/5YTkeD6gLqfQsQr86YiK5nV5xCb2PL8KwnmMCocVImX2fm3vQIDAQABo1EwTzALBgNVHQ8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUcBUzPW7ZQuqUMP3RFTCbDU1hTGUwEAYJKwYBBAGCNxUBBAMCAQAwDQYJKoZIhvcNAQELBQADggEBAIYye4+Gd8piML1BXzkMNgt6aNOu7hS4h3sYfojtpV40OdJ64/Pt9pC5NecMt8B0ikiZvfu9c+xO20VB3uFDGNWVLqfoaZi+cvMAYH9gMrK8KiNe21jekbG1uTuIPZ0oJtEDnn7aJ+rXzVTEe6QHZ/gjVcZoPy1/rdCnzMRdH0NS6xpn0HqWpy/IxjnJP0Ux6ZPNzrEmhsUGruVJwF8u5+FTlD9pF55eHqI4COtEqJ8YEMb25s8xCCJVL0al+LbydR0neG4Ic/zA0QEwB7ixFsuytaBUOXv4QVpsu7R4mtWQHdSoJz3I+g117tHDlJfGEoQpsc/gHBwMptPQCobpI30=-----END CERTIFICATE-----";
-           // string cert = "-----BEGIN CERTIFICATE-----\nMIIDeTCCAmGgAwIBAgIQSVQNM9+tTo9Dd52qg4MI1DANBgkqhkiG9w0BAQsFADBP\nMRMwEQYKCZImiZPyLGQBGRYDbGFiMRkwFwYKCZImiZPyLGQBGRYJa2V5ZmFjdG9y\nMR0wGwYDVQQDExRrZXlmYWN0b3ItS0ZUUkFJTi1DQTAeFw0xOTA1MTAwMzMyMzJa\nFw0yNDA1MTAwMzQyMzFaME8xEzARBgoJkiaJk/IsZAEZFgNsYWIxGTAXBgoJkiaJ\nk/IsZAEZFglrZXlmYWN0b3IxHTAbBgNVBAMTFGtleWZhY3Rvci1LRlRSQUlOLUNB\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmqN1+RED9SuRsLnIF4AB\n7uFkaismnxhGXc9LWAVBPc8bt8McchMlHmJqVN1DPR0ZT8tVT8jqIODBULrcWZVo\n6ox15BTrFqzrFUiIuuq16NDW+WYu2rljoMBaOTegkmWs7ZoME+w/MHqFFqPBBvg7\nuDSZW/w+1VKyn7aRA2Bywy6o5UHpladsokVKwNhyMQvfJnJQ2xJio8mhXV1AM15F\nCp8hQZ8dXj/cAPKQxk31M1thIP7M8yx779QbxIs6PKLNxarmY+D73r8Q3t8scO+G\nVQUwSvbDZiF+kzpl/5YTkeD6gLqfQsQr86YiK5nV5xCb2PL8KwnmMCocVImX2fm3\nvQIDAQABo1EwTzALBgNVHQ8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4E\nFgQUcBUzPW7ZQuqUMP3RFTCbDU1hTGUwEAYJKwYBBAGCNxUBBAMCAQAwDQYJKoZI\nhvcNAQELBQADggEBAIYye4+Gd8piML1BXzkMNgt6aNOu7hS4h3sYfojtpV40OdJ6\n4/Pt9pC5NecMt8B0ikiZvfu9c+xO20VB3uFDGNWVLqfoaZi+cvMAYH9gMrK8KiNe\n21jekbG1uTuIPZ0oJtEDnn7aJ+rXzVTEe6QHZ/gjVcZoPy1/rdCnzMRdH0NS6xpn\n0HqWpy/IxjnJP0Ux6ZPNzrEmhsUGruVJwF8u5+FTlD9pF55eHqI4COtEqJ8YEMb2\n5s8xCCJVL0al+LbydR0neG4Ic/zA0QEwB7ixFsuytaBUOXv4QVpsu7R4mtWQHdSo\nJz3I+g117tHDlJfGEoQpsc/gHBwMptPQCobpI30=\n-----END CERTIFICATE-----";
-            //Upload("172.78.231.174:44130", "KFTrainRoot.cer", cert);
+          // string cert = "-----BEGIN CERTIFICATE-----\nMIIDeTCCAmGgAwIBAgIQSVQNM9+tTo9Dd52qg4MI1DANBgkqhkiG9w0BAQsFADBP\nMRMwEQYKCZImiZPyLGQBGRYDbGFiMRkwFwYKCZImiZPyLGQBGRYJa2V5ZmFjdG9y\nMR0wGwYDVQQDExRrZXlmYWN0b3ItS0ZUUkFJTi1DQTAeFw0xOTA1MTAwMzMyMzJa\nFw0yNDA1MTAwMzQyMzFaME8xEzARBgoJkiaJk/IsZAEZFgNsYWIxGTAXBgoJkiaJ\nk/IsZAEZFglrZXlmYWN0b3IxHTAbBgNVBAMTFGtleWZhY3Rvci1LRlRSQUlOLUNB\nMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmqN1+RED9SuRsLnIF4AB\n7uFkaismnxhGXc9LWAVBPc8bt8McchMlHmJqVN1DPR0ZT8tVT8jqIODBULrcWZVo\n6ox15BTrFqzrFUiIuuq16NDW+WYu2rljoMBaOTegkmWs7ZoME+w/MHqFFqPBBvg7\nuDSZW/w+1VKyn7aRA2Bywy6o5UHpladsokVKwNhyMQvfJnJQ2xJio8mhXV1AM15F\nCp8hQZ8dXj/cAPKQxk31M1thIP7M8yx779QbxIs6PKLNxarmY+D73r8Q3t8scO+G\nVQUwSvbDZiF+kzpl/5YTkeD6gLqfQsQr86YiK5nV5xCb2PL8KwnmMCocVImX2fm3\nvQIDAQABo1EwTzALBgNVHQ8EBAMCAYYwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4E\nFgQUcBUzPW7ZQuqUMP3RFTCbDU1hTGUwEAYJKwYBBAGCNxUBBAMCAQAwDQYJKoZI\nhvcNAQELBQADggEBAIYye4+Gd8piML1BXzkMNgt6aNOu7hS4h3sYfojtpV40OdJ6\n4/Pt9pC5NecMt8B0ikiZvfu9c+xO20VB3uFDGNWVLqfoaZi+cvMAYH9gMrK8KiNe\n21jekbG1uTuIPZ0oJtEDnn7aJ+rXzVTEe6QHZ/gjVcZoPy1/rdCnzMRdH0NS6xpn\n0HqWpy/IxjnJP0Ux6ZPNzrEmhsUGruVJwF8u5+FTlD9pF55eHqI4COtEqJ8YEMb2\n5s8xCCJVL0al+LbydR0neG4Ic/zA0QEwB7ixFsuytaBUOXv4QVpsu7R4mtWQHdSo\nJz3I+g117tHDlJfGEoQpsc/gHBwMptPQCobpI30=\n-----END CERTIFICATE-----";
+           // Upload("166.145.144.73:10080", "KFTrainRoot.cer", cert);
             //Console.ReadLine();
-            //Upload("http://172.78.231.174:44130/upload.htm", cert);
+            //Upload("http://166.145.144.73:10080/upload.htm", cert);
 
             /*
             string templateName = "WebServer";
@@ -111,18 +116,19 @@ namespace BoschIPCameraTestConsole
             //Console.ReadLine();
            
             ILoggerFactory invLoggerFactory = new LoggerFactory();
-            ILogger<BoschIPcameraClient> invLogger = invLoggerFactory.CreateLogger<BoschIPcameraClient>();
+            ILogger<Reenrollment> invLogger = invLoggerFactory.CreateLogger<Reenrollment>();
 
             BoschIPcameraClient client = new BoschIPcameraClient();
-            String returnCode = null;
+            String returnCode = "";
 
             //generate the CSR on the camera
-            client.setupStandardBoschIPcameraClient("172.78.231.174:44130", "mizell", "Keyfactor1!");
+            client.setupStandardBoschIPcameraClient("172.78.231.174:44130", "mizell", "Keyfactor1!", setupCSRSubject(), invLogger);
+            //client.setupStandardBoschIPcameraClient("166.145.144.73:10080", "service", "DHStrp2022!", setupCSRSubject());
 
             //delete cert if it exists
             returnCode = client.deleteCertByName("keyfactor");
 
-         //   returnCode = client.certCreate("keyfactor");
+            returnCode = client.certCreate("keyfactor");
 
             if (returnCode != "fail")
             {
@@ -133,12 +139,12 @@ namespace BoschIPCameraTestConsole
             //upload the cert
 
             //turn on 802.1x
-           // returnCode = client.change8021xSettings("1");
+           //returnCode = client.change8021xSettings("0");
 
             if (returnCode != "fail")
             {
                 //set cert usage
-              //  returnCode = client.setCertUsage("keyfactor", "00000001");
+           //   returnCode = client.setCertUsage("HTTPSCert", "80000000");
 
                 if (returnCode != "fail")
                 {
@@ -148,6 +154,22 @@ namespace BoschIPCameraTestConsole
             }
 
             
+        }
+
+        //define standard Subject for CSR. IP address will vary by device to be passed in at runtime
+        //likely all this data could be captured in the cert store definition - should not be hardcoded
+        private static Dictionary<string, string> setupCSRSubject()
+        {
+            Dictionary<string, string> csrSubject = new Dictionary<string, string>();
+
+            csrSubject.Add("C", "US");
+            csrSubject.Add("ST", "North Carolina");
+            csrSubject.Add("L", "Apex");
+            csrSubject.Add("O", "Homecheese");
+            csrSubject.Add("OU", "IT");
+            csrSubject.Add("CN", "172.78.231.174");
+
+            return csrSubject;
         }
 
         public static bool GetItems(IEnumerable<CurrentInventoryItem> items)

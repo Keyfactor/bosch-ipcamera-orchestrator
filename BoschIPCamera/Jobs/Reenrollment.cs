@@ -50,6 +50,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         public string keyfactorHost;
         public string keyfactorUser;
         public string keyfactorPass;
+        public string certUsage;
     }
 
     public class Reenrollment : IReenrollmentJobExtension
@@ -108,7 +109,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                         }
                         catch (Exception e)
                         {
-                            Console.WriteLine(e.Message);
+                            _logger.LogError(e.Message);
                             throw;
                         }
                     }, null);
@@ -119,7 +120,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine(e.Message);
+                    _logger.LogError(e.Message);
                     throw;
                 }
             }, httpWebRequest);
@@ -214,7 +215,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
             try
             {
-
                 var sb = new StringBuilder();
                 sb.Append("");
 
@@ -223,23 +223,80 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 boschIPCameraDetails storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
                 BoschIPcameraClient client = new BoschIPcameraClient();
 
-                //need to parse the jobConfiguration for the cert details - create a map like in the BoschIPCamera class and pass it in
+                //setup the CSR details
+                _logger.LogDebug("Setup camera CSR Dictionary");
+                Dictionary<string, string> csrSubject = setupCSRSubject(storeProperties);
+
+                //setup the Camera Details
+                _logger.LogDebug("Build default RestSharp client");
+                client.setupStandardBoschIPcameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
+                    jobConfiguration.ServerPassword, csrSubject, _logger);
+
+                //delete existing certificate
+                _logger.LogDebug("Delete existing cert " + jobConfiguration.CertificateStoreDetails.StorePath);
+                string returnCode = client.deleteCertByName(jobConfiguration.CertificateStoreDetails.StorePath);
+
+                if (returnCode == "fail")
+                {
+                    _logger.LogError("Error deleting existing certificate " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                    sb.Append("Error deleting existing certificate " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                }
 
                 //generate the CSR on the camera
-                client.setupStandardBoschIPcameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
-                    jobConfiguration.ServerPassword);
-                client.certCreate(jobConfiguration.CertificateStoreDetails.StorePath);
-                
+                _logger.LogDebug("Generate CSR on camera");
+                returnCode = client.certCreate(jobConfiguration.CertificateStoreDetails.StorePath);
+
+                if (returnCode == "fail")
+                {
+                    _logger.LogError("Error generating CSR for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                    sb.Append("Error generating CSR for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                }
+
                 //get the CSR from the camera
                 string responseContent = client.downloadCSRFromCamera(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
                     jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath);
                 _logger.LogDebug("Downloaded CSR: " + responseContent);
+              
+                //sign CSR in Keyfactor
                 string body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"{storeProperties.CA}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{storeProperties.template}\"}}";
                 enrollResponse resp = MakeWebRequest<enrollResponse>(storeProperties.keyfactorHost+"/KeyfactorAPI/Enrollment/CSR", storeProperties.keyfactorUser, jobConfiguration.CertificateStoreDetails.StorePassword, body, skipCertCheck: true);
                 string cert = resp.CertificateInformation.Certificates[0];
                 cert = cert.Substring(cert.IndexOf("-----"));
                 _logger.LogDebug(cert);
+
+                //upload the signed cert to the camera
+                _logger.LogDebug("Uploading cert");
                 Upload(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername, jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath+".cer", cert);
+
+                //turn on 802.1x - "1" is on
+                _logger.LogDebug("Turn on 802.1x");
+                returnCode = client.change8021xSettings("1");
+                if (returnCode == "fail")
+                {
+                    _logger.LogError("Error setting 802.1x to on for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                    sb.Append("Error setting 802.1x to on for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                }
+
+                //set cert usage
+                _logger.LogDebug("Set cert usage to " + storeProperties.certUsage);
+                returnCode = client.setCertUsage(jobConfiguration.CertificateStoreDetails.StorePath, storeProperties.certUsage);
+                if (returnCode == "fail")
+                {
+                    _logger.LogError("Error setting certUsage of " + storeProperties.certUsage + "for store path " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                    sb.Append("Error setting certUsage of " + storeProperties.certUsage + "for store path " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                }
+
+                //reboot the camera
+                _logger.LogDebug("Reboot camera");
+                client.rebootCamera();
 
                 return new JobResult
                 {
@@ -257,6 +314,18 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             }
             
         }
+        private Dictionary<string, string> setupCSRSubject(boschIPCameraDetails storeProperties)
+        {
+            Dictionary<string, string> csrSubject = new Dictionary<string, string>();
 
+            csrSubject.Add("C", storeProperties.country);
+            csrSubject.Add("ST", storeProperties.state);
+            csrSubject.Add("L", storeProperties.city);
+            csrSubject.Add("O", storeProperties.org);
+            csrSubject.Add("OU", storeProperties.OU);
+            csrSubject.Add("CN", storeProperties.CN);
+
+            return csrSubject;
+        }
     }
 }
