@@ -63,12 +63,21 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             
             string boundary = "----------" + DateTime.Now.Ticks.ToString("x");
             string fileHeader = string.Format("Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{0}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n", fileName);
-            HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
             CredentialCache credCache = new CredentialCache();
             credCache.Add(new Uri("http://" + host), "Digest", new NetworkCredential(username, password));
+
+            HttpWebRequest authRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
+            authRequest.Method = "GET";
+            authRequest.Credentials = credCache;
+            authRequest.GetResponse();
+
+            HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
             httpWebRequest.Credentials = credCache;
             httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
             httpWebRequest.Method = "POST";
+            httpWebRequest.PreAuthenticate = true;
+
+            IAsyncResult y = null;
             var x = httpWebRequest.BeginGetRequestStream((result) =>
             {
                 try
@@ -83,7 +92,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                         WriteToStream(requestStream, fileData);
                         WriteToStream(requestStream, "\r\n--" + boundary + "--\r\n");
                     }
-                    request.BeginGetResponse(a =>
+                    y = request.BeginGetResponse(a =>
                     {
                         try
                         {
@@ -103,6 +112,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                             throw;
                         }
                     }, null);
+                    while (!y.IsCompleted)
+                    {
+                        Thread.Sleep(1000);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -110,6 +123,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                     throw;
                 }
             }, httpWebRequest);
+            while (y == null || !y.IsCompleted)
+            {
+                Thread.Sleep(100);
+            }
             while (!x.IsCompleted)
             {
                 Thread.Sleep(100);
