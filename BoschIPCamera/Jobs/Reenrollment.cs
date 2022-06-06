@@ -70,6 +70,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             HttpWebRequest authRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
             authRequest.Method = "GET";
             authRequest.Credentials = credCache;
+            authRequest.PreAuthenticate = true;
             authRequest.GetResponse();
 
             HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
