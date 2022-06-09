@@ -8,7 +8,6 @@ using System.ServiceModel;
 using System.Xml;
 using Microsoft.Extensions.Logging;
 using Keyfactor.Logging;
-using Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 {
@@ -18,15 +17,15 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         private string _cameraURL;
         private RestClient _client = null;
         private RestResponse _response = null;
-        private ILogger<Reenrollment> _logger;
+        private ILogger _logger;
 
         public void setupStandardBoschIPcameraClient(string cameraHostURL, string userName, string password, Dictionary<string, string> csrSubject,
-            ILogger<Reenrollment> logger)
+            ILogger logger)
         {
             ///_logger.LogTrace("Initializing RestSharp Client");
             _cameraURL = "http://" + cameraHostURL + "/rcp.xml?";
             //_logger.LogTrace("Camera URL: " + _cameraURL);
-          
+
             _client = new RestClient(_cameraURL)
             {
                 Authenticator = new DigestAuthenticator(userName, password)
@@ -34,6 +33,32 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             s_csrSubject = csrSubject;
             _logger = logger;
+        }
+
+        public Dictionary<String,String> listCerts(string URL, string user, string pass)
+        {
+            CancellationTokenSource source = new CancellationTokenSource();
+            CancellationToken token = source.Token;
+
+            var request = new RestRequest()
+                .AddQueryParameter("command", "0x0BEB")
+                .AddQueryParameter("type", "P_OCTET")
+                .AddQueryParameter("direction", "READ")
+                .AddQueryParameter("num", "1");
+
+            string requestValue = request.Resource;
+
+            Task<RestResponse> task = _client.GetAsync(request, token);
+            task.Wait();
+            List<String> strs = getCameraCertList(task.Result.Content);
+            Dictionary<String, String> files = new Dictionary<string, string>();
+            foreach(string s in strs)
+            {
+                download(URL, user, pass, s).Wait();
+                files.Add(s, _response.Content);
+            }
+            
+            return files;
         }
 
         //need to think through the parameters sent in here
@@ -107,7 +132,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 {
                     Thread.Sleep(10000);
                     count++;
-                    downloadCSR(cameraHostURL, userName, password, certName).Wait();
+                    download(cameraHostURL, userName, password, certName,"?type=csr").Wait();
                    // _logger.LogInformation("CSR downloaded successfully for " + certName);
                     haveCSR = true;
                     return _response.Content;
@@ -121,13 +146,13 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             _logger.LogError("Failed to download CSR");
             return null;
         }
-        private async Task downloadCSR(string cameraHostURL, string userName, string password, string certName)
+        private async Task download(string cameraHostURL, string userName, string password, string certName, string paramString="")
         {
             CancellationTokenSource source = new CancellationTokenSource();
             CancellationToken token = source.Token;
 
             _logger.LogTrace("Initializing RestSharp Client for CSR Download");
-            string cameraURL = "http://" + cameraHostURL + "/cert_download/" + certName.Replace(" ", "%20") + ".pem?type=csr";
+            string cameraURL = $"http://{cameraHostURL}/cert_download/{certName.Replace(" ", "%20")}.pem{paramString}";
             _logger.LogTrace("Camera URL: " + cameraURL);
 
             RestClient client = new RestClient(cameraURL)
@@ -349,6 +374,29 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 errorCode = errorList[0].InnerXml;
             }
             return errorCode;
+        }
+
+        public List<String> getCameraCertList(String response)
+        {
+            XmlDocument xmlResponse = new XmlDocument();
+            xmlResponse.LoadXml(response);
+
+            // Parse raw hex content from the response
+            string s = 
+                xmlResponse.GetElementsByTagName("str")[0].InnerText
+                .Replace(" ", "")
+                .Replace("\r","")
+                .Replace("\n", "");
+            
+            // Record structure starts with 2 bytes representing length of the record, followed by 6 more bytes, then filename, then a zero byte.
+            // Iterate through records by reading length tag, extracting the filename in hex and converting.
+            List<String> certNames = new List<String>();
+            Func<string,int,string> getName = (s,start) => s.Substring(start, s.IndexOf("00", start) - start);
+            for (int i = 0; i < s.Length; i += Convert.ToInt32(s.Substring(i, 4), 16) * 2)
+            {
+                certNames.Add(HexadecimalEncoding.FromHex(getName(s,i+16)));
+            }
+            return certNames;
         }
     }
 }

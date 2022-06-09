@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 {
@@ -63,6 +64,15 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             int stringLength = myString.Length + 4;
             string hexValue = String.Format("{1,1:X}", 0, stringLength);
             return hexValue.PadLeft(padValue, padChar);
+        }
+
+        // Split input hex into pairs each representing one byte, convert that into a character and concatenate.
+        public static string FromHex(string hex)
+        {
+            return new String(
+                Enumerable.Range(0, hex.Length / 2)
+                .Select(i => (char)Convert.ToInt32($"{hex[2 * i]}{hex[2 * i + 1]}",16))
+                .ToArray());
         }
     }
 }
