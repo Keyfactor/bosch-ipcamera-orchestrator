@@ -58,9 +58,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         public string ExtensionName => "BoschIPCamera";
         private readonly ILogger<Reenrollment> _logger;
 
-        // Perform web request with templated structure of returned data. Optionally performs HTTPS request without verifying server certificate.
-        private void Upload(string host, string username, string password, string fileName, string fileData)
+        private void UploadSync(string host, string username, string password, string fileName, string fileData)
         {
+            _logger.LogTrace("Starting Cert upload to camera " + host);
             
             string boundary = "----------" + DateTime.Now.Ticks.ToString("x");
             string fileHeader = string.Format("Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{0}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n", fileName);
@@ -71,67 +71,59 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             authRequest.Method = "GET";
             authRequest.Credentials = credCache;
             authRequest.PreAuthenticate = true;
-            authRequest.GetResponse();
 
-            HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
-            httpWebRequest.Credentials = credCache;
-            httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
-            httpWebRequest.Method = "POST";
-            httpWebRequest.PreAuthenticate = true;
+            try
+            {
+                _logger.LogTrace("Get Auth call to camera on " + host);
+                WebResponse response = authRequest.GetResponse();
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+            }
 
-            IAsyncResult y = null;
-            var x = httpWebRequest.BeginGetRequestStream((result) =>
+            bool certOnCamera = false;
+            int count = 0;
+            //keep trying until we get the cert on camera or try 5 times
+            while (!certOnCamera && count <= 5)
             {
                 try
                 {
-                    HttpWebRequest request = (HttpWebRequest)result.AsyncState;
-                    using (Stream requestStream = request.EndGetRequestStream(result))
-                    {
-                        WriteToStream(requestStream, "--" + boundary + "\r\n");
-                        _logger.LogDebug(fileHeader);
-                        WriteToStream(requestStream, fileHeader);
-                        _logger.LogDebug(fileData);
-                        WriteToStream(requestStream, fileData);
-                        WriteToStream(requestStream, "\r\n--" + boundary + "--\r\n");
-                    }
-                    y = request.BeginGetResponse(a =>
-                    {
-                        try
-                        {
-                            var response = request.EndGetResponse(a);
-                            var responseStream = response.GetResponseStream();
-                            using (var sr = new StreamReader(responseStream))
-                            {
-                                using (StreamReader streamReader = new StreamReader(response.GetResponseStream()))
-                                {
-                                    string responseString = streamReader.ReadToEnd();
-                                }
-                            }
-                        }
-                        catch (Exception e)
-                        {
-                            _logger.LogError(e.Message);
-                            throw;
-                        }
-                    }, null);
-                    while (!y.IsCompleted)
-                    {
-                        Thread.Sleep(1000);
-                    }
+                    count++;
+                    _logger.LogTrace("Post call to camera on " + host);
+                    HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
+                    httpWebRequest.Credentials = credCache;
+                    httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
+                    httpWebRequest.Method = "POST";
+                    //httpWebRequest.PreAuthenticate = true;
+
+                    Stream requestStream = httpWebRequest.GetRequestStream();
+                    WriteToStream(requestStream, "--" + boundary + "\r\n");
+                    WriteToStream(requestStream, fileHeader);
+                    WriteToStream(requestStream, fileData);
+                    WriteToStream(requestStream, "\r\n--" + boundary + "--\r\n");
+                    //requestStream.Close();
+
+                    HttpWebResponse myHttpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
+
+
+                    Stream responseStream = myHttpWebResponse.GetResponseStream();
+
+                    StreamReader myStreamReader = new StreamReader(responseStream, Encoding.Default);
+
+                    string pageContent = myStreamReader.ReadToEnd();
+
+                    myStreamReader.Close();
+                    responseStream.Close();
+
+                    myHttpWebResponse.Close();
+                    return;
                 }
                 catch (Exception e)
                 {
                     _logger.LogError(e.Message);
-                    throw;
+                    _logger.LogTrace("Failed to push cert on attempt " + count + " trying again if less than or equal to 5");
                 }
-            }, httpWebRequest);
-            while (y == null || !y.IsCompleted)
-            {
-                Thread.Sleep(100);
-            }
-            while (!x.IsCompleted)
-            {
-                Thread.Sleep(100);
             }
         }
 
@@ -225,34 +217,26 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 BoschIPcameraClient client = new BoschIPcameraClient();
 
                 //setup the CSR details
-                _logger.LogDebug("Setup camera CSR Dictionary");
                 Dictionary<string, string> csrSubject = setupCSRSubject(storeProperties);
 
                 //setup the Camera Details
-                _logger.LogDebug("Build default RestSharp client");
                 client.setupStandardBoschIPcameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
                     jobConfiguration.ServerPassword, csrSubject, _logger);
 
                 //delete existing certificate
-                _logger.LogDebug("Delete existing cert " + jobConfiguration.CertificateStoreDetails.StorePath);
                 string returnCode = client.deleteCertByName(jobConfiguration.CertificateStoreDetails.StorePath);
 
-                if (returnCode == "fail")
+                if (returnCode != "pass")
                 {
-                    _logger.LogError("Error deleting existing certificate " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
-                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
-                    sb.Append("Error deleting existing certificate " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                     sb.Append("Error deleting existing certificate " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
 
                 //generate the CSR on the camera
-                _logger.LogDebug("Generate CSR on camera");
                 returnCode = client.certCreate(jobConfiguration.CertificateStoreDetails.StorePath);
 
-                if (returnCode == "fail")
+                if (returnCode != "pass")
                 {
-                    _logger.LogError("Error generating CSR for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
-                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                     sb.Append("Error generating CSR for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
@@ -270,34 +254,30 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 _logger.LogDebug(cert);
 
                 //upload the signed cert to the camera
-                _logger.LogDebug("Uploading cert");
-                Upload(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername, jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath+".cer", cert);
+                UploadSync(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername, jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath+".cer", cert);
 
                 //turn on 802.1x - "1" is on
-                _logger.LogDebug("Turn on 802.1x");
                 returnCode = client.change8021xSettings("1");
-                if (returnCode == "fail")
+                if (returnCode != "pass")
                 {
-                    _logger.LogError("Error setting 802.1x to on for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
-                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
-                    sb.Append("Error setting 802.1x to on for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                     sb.Append("Error setting 802.1x to on for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
 
                 //set cert usage
-                _logger.LogDebug("Set cert usage to " + storeProperties.certUsage);
                 returnCode = client.setCertUsage(jobConfiguration.CertificateStoreDetails.StorePath, storeProperties.certUsage);
-                if (returnCode == "fail")
+                if (returnCode != "pass")
                 {
-                    _logger.LogError("Error setting certUsage of " + storeProperties.certUsage + "for store path " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
-                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                     sb.Append("Error setting certUsage of " + storeProperties.certUsage + "for store path " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
 
                 //reboot the camera
-                _logger.LogDebug("Reboot camera");
                 client.rebootCamera();
+                if (returnCode != "pass")
+                {
+                    sb.Append("Error rebooting camera " + jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                }
 
                 return new JobResult
                 {
@@ -305,8 +285,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                     JobHistoryId = jobConfiguration.JobHistoryId,
                     FailureMessage = sb.ToString()
                 };
-
-
             }
             catch (Exception e)
             {

@@ -89,7 +89,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 if (returnCode != null)
                 {
                     _logger.LogError("Camera failed to generate CSR with error code " + returnCode);
-                    return "fail";
+                    return returnCode;
                 }
                 _logger.LogInformation("CSR call completed successfully for " + certificateName);
                 return "pass";
@@ -97,10 +97,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             catch (ProtocolException ex)
             {
                 _logger.LogError("CSR call failed with the following error: "+ ex.ToString());
+                return ex.ToString();
             };
-
-            return "fail";
         }
+
 
         //Call the camera to generate a CSR
         private async Task generateCSROnCameraAsync(string payload)
@@ -125,12 +125,12 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             _logger.LogTrace("Download " + certName + " CSR from Camera: " + _cameraURL);
             bool haveCSR = false;
             int count = 0;
-            //keep trying until we get the cert or try 20 times (wait 10 seconds each time)
-            while (!haveCSR && count <= 20)
+            //keep trying until we get the cert or try 30 times (wait 5 seconds each time)
+            while (!haveCSR && count <= 30)
             {
                 try
                 {
-                    Thread.Sleep(10000);
+                    Thread.Sleep(5000);
                     count++;
                     download(cameraHostURL, userName, password, certName,"?type=csr").Wait();
                    // _logger.LogInformation("CSR downloaded successfully for " + certName);
@@ -139,7 +139,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError("CSR download failed with the following error: " + ex.ToString());
+                    _logger.LogTrace("CSR download failed with the following error: " + ex.ToString());
                 };
             }
 
@@ -177,17 +177,16 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 if (returnCode != null)
                 {
                     _logger.LogError("Camera failed to change 802.1x with error code " + returnCode);
-                    return "fail";
+                    return returnCode;
                 }
-                return "pass";
                 _logger.LogInformation("802.1x setting changed successfully for " + _cameraURL);
+                return "pass"; 
             }
             catch (Exception ex)
             {
                 _logger.LogError("802.1x setting change failed with the following error: " + ex.ToString());
+                return ex.ToString();
             };
-
-            return "fail";
         }
 
         //Enable/Disable 802.1x on the camera after the certs are in place
@@ -222,17 +221,16 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 if(returnCode != null)
                 {
                     _logger.LogError("Camera failed to reboot with error code " + returnCode);
-                    return "fail";
+                    return returnCode;
                 }
-                return "pass";
                 _logger.LogInformation("Camera rebooted sucessfully " + _cameraURL);
+                return "pass";     
             }
             catch (Exception ex)
             {
                 _logger.LogError("Failed to reboot Camera " + _cameraURL + " with the following error: " + ex.ToString());
+                return ex.ToString();
             };
-
-            return "fail";
         }
 
         private async Task reboot()
@@ -250,11 +248,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             string requestValue = request.Resource;
 
             _response = await _client.GetAsync(request, token);
-
         }
 
         //set the cert usage on a cert
-        //this is done in two steps - first reset for the usage type then set for the cert name
         public string setCertUsage(string certName, string usageCode)
         {
             _logger.LogTrace("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL);
@@ -264,35 +260,22 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             try
             {
-                //first reset the cert usage
-              //  setCertUsage(payload).Wait();
-              //  String returnCode = parseCameraResponse(_response.Content);
-              //  if (returnCode != null)
-              //  {
-                    // _logger.LogError("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL " failed with error code " + returnCode);
-             //       return "fail";
-             //   } 
-             //   else
-             //   {
-                    //now set the cert usage for the actual cert
-                    setCertUsage(additionalPayload).Wait();
-                    string returnCode = parseCameraResponse(_response.Content);
-                    if (returnCode != null)
-                    {
-                        _logger.LogError("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL + " failed with error code " + returnCode);
-                        return "fail";
-                    }
-
-              //  }
-                return "pass";
+                setCertUsage(additionalPayload).Wait();
+                string returnCode = parseCameraResponse(_response.Content);
+                if (returnCode != null)
+                {
+                    _logger.LogError("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL + " failed with error code " + returnCode);
+                    return returnCode;
+                }
                 _logger.LogInformation("Successfully changed cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL);
+                return "pass";
+            
             }
             catch (Exception ex)
             {
                 _logger.LogError("Cert usage change failed with the following error: " + ex.ToString());
-            };
-
-            return "fail";
+                return ex.ToString();
+            };    
         }
 
         //can be used to reset/clear existing cert usage and to set cert usage on a specific cert
@@ -329,17 +312,16 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 if (returnCode != null)
                 {
                     _logger.LogError("Deleting cert " + certName + " for camera " + _cameraURL + " failed with error code " + returnCode);
-                    return "fail";
+                    return returnCode;
                 }
-                return "pass";
                 _logger.LogInformation("Successfully deleted cert " + certName + " for camera " + _cameraURL);
+                return "pass";  
             }
             catch (Exception ex)
             {
                 _logger.LogError("Deleting cert failed with the following error: " + ex.ToString());
-            };
-
-            return "fail";
+                return ex.ToString();
+            };   
         }
 
         //delete a cert on camera
@@ -358,7 +340,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             string requestValue = request.Resource;
 
             _response = await _client.GetAsync(request, token);
-
         }
 
         //returns error code if camera call fails, blank if successful
