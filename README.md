@@ -23,9 +23,9 @@ This agent implements three job types – Inventory, Reenrollment and Remove. Belo
 
 **Bosch IP Camera Configuration**
 
-1. OOTB, the camera comes with three accounts. You need an account created that has "service" level access:
+1. Out of the box, the camera comes with three accounts. You need an account created that has "service" level access:
 ![](images/Bosch_Security_Systems.gif)
-2. Inital design is using HTTP because we don't have a trusted cert on the camera to use HTTPS. Further invenstigaion with prospects/customers will help us identify if we need to switch to HTTPS after the intial certificate is installed.
+2. Initial design is using HTTP because we don't have a trusted cert on the camera to use HTTPS. Further invenstigaion with prospects/customers will help us identify if we need to switch to HTTPS after the initial certificate is installed.
 3. Currently supports Bosch firmware version 7.10.0095 - 7.82. Has not been tested with any other firmeware version.
 
 **1. Create the New Certificate Store Type for the Bosch IP Camera Universal Orchestrator**
@@ -37,13 +37,13 @@ SETTING TAB  |  CONFIG ELEMENT	| DESCRIPTION
 ------|-----------|------------------
 Basic |Name	|Descriptive name for the Store Type.  Bosch IP Camera.
 Basic |Short Name	|The short name that identifies the registered functionality of the orchestrator. Must be BIPCamera
-Basic |Custom Capability|Checked with value BoschIpCamera.
+Basic |Custom Capability|Checked, with value "BoschIpCamera".
 Basic |Job Types	|Inventory, Remove and Reenrollment are the supported job types. 
 Basic |Needs Server	|Must be checked
-Basic |Blueprint Allowed	|Checked
+Basic |Blueprint Allowed	|Optional
 Basic |Requires Store Password	|Determines if a store password is required when configuring an individual store.  This must be checked.
 Basic |Supports Entry Password	|Determined if an individual entry within a store can have a password.  This must be unchecked.
-Advanced |Store Path Type| Determines how the user will enter the store path when setting up the cert store.  Freeform
+Advanced |Store Path Type| Determines how the user will enter the store path when setting up the cert store. This will represent the file name on the camera. Select "Freeform"
 Advanced |Supports Custom Alias	|Determines if an individual entry within a store can have a custom Alias.  Forbidden
 Advanced |Private Key Handling |Determines how the orchestrator deals with private keys.  Optional
 Advanced |PFX Password Style |Determines password style for the PFX Password. Default
@@ -80,7 +80,7 @@ Entry Parameters|None required| N/A
 
 
 **2. Register the BoschIPCamera Universal Orchestrator with Keyfactor**
-See Keyfactor InstallingKeyfactorOrchestrators.pdf Documentation.  Get from your Keyfactor contact/representative.
+See Keyfactor "Installing Keyfactor Orchestrators" Documentation, available from your Keyfactor contact/representative.
 
 **3. Create a Bosch IP Camera Store within Keyfactor Command**
 
@@ -96,7 +96,8 @@ CONFIG ELEMENT	|DESCRIPTION
 Category	|The type of certificate store to be configured. Select category based on the display name configured above "Bosch IP Camera".
 Container	|This is a logical grouping of like stores. This configuration is optional and does not impact the functionality of the store.
 Client Machine	|The IP address of the Camera.  Sample is "192.167.231.174". May or may not require the port.
-Store Path	|Naming conventions used in the camera for the type of cert (customer to define). Example "TLSClient" for client certs and "HTTPSCert" for server certs
+Server credentials	|Enter the username and password to remotely access the camera via basic authentication, or configure retrieval of these values from an external system.
+Store Path	|Naming conventions used in the camera for the type of cert (customer to define). Example "TLSClient" for client certs and "HTTPSCert" for server certs.
 CN	|For on device CSR
 Country	|For on device CSR
 State	|For on device CSR
@@ -109,7 +110,7 @@ Keyfactor Host	|FQDN of Keyfactor Command for API calls. Example:customer.keyfac
 Keyfactor Username	|Username for API calls in Keyfactor Command.
 Certificate Usage	|Bosch Camera usage code. See options above.
 Orchestrator	|This is the orchestrator server registered with the appropriate capabilities to manage this certificate store type. 
-Store Password	|Password for Keyfactor Username used for API calls.
+Store Password	|Password for Keyfactor Username used for Keyfactor API call during certificate reenrollment jobs.
 Inventory Schedule	|The interval that the system will use to report on what certificates are currently in the store. 
 Use SSL	|This should NOT be checked.
 
