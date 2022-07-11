@@ -1,12 +1,10 @@
-<!-- add integration specific information below -->
-*** 
 **Bosch Camera Configuration**
 
 **Overview**
 
 The Bosch IP Camera Orchestrator remotely manages certificates on the camera.
 
-This agent implements three job types – Inventory, Reenrollment and Remove. Below are the steps necessary to configure this AnyAgent.
+This agent implements three job types – Inventory, Reenrollment and Remove. Below are the steps necessary to configure this AnyAgent..
 
 **Bosch IP Camera Configuration**
 
