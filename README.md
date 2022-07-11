@@ -1,28 +1,8 @@
-# BoschIPcamera
-
-Bosch IP Camera Orchestrator for Add, Remove and Inventory.
-
-#### Integration status: 
-
-## About the Keyfactor Universal Orchestrator Capability
-
-This repository contains a Universal Orchestrator Capability which is a plugin to the Keyfactor Universal Orchestrator. Within the Keyfactor Platform, Orchestrators are used to manage “certificate stores” &mdash; collections of certificates and roots of trust that are found within and used by various applications.
-
-The Universal Orchestrator is part of the Keyfactor software distribution and is available via the Keyfactor customer portal. For general instructions on installing Capabilities, see the “Keyfactor Command Orchestrator Installation and Configuration Guide” section of the Keyfactor documentation. For configuration details of this specific Capability, see below in this readme.
-
-The Universal Orchestrator is the successor to the Windows Orchestrator. This Capability plugin only works with the Universal Orchestrator and does not work with the Windows Orchestrator.
-
----
-
-
-
-
----
-
 # Bosch IP Camera
-Bosch IP Camera Universal Orchestrator for Reenrollment, Remove and Inventory
 
-#### Integration status: Pilot - Ready for use in test environments. Not for use in production.
+Bosch IP Camera Orchestrator for Add, Remove and Inventory
+
+#### Integration status: Prototype - Demonstration quality. Not for use in customer environments.
 
 ## About the Keyfactor Universal Orchestrator Capability
 
@@ -32,15 +12,33 @@ The Universal Orchestrator is part of the Keyfactor software distribution and is
 
 The Universal Orchestrator is the successor to the Windows Orchestrator. This Capability plugin only works with the Universal Orchestrator and does not work with the Windows Orchestrator.
 
-<!-- add integration specific information below -->
-*** 
+---
+
+
+
+## Platform Specific Notes
+
+The Keyfactor Universal Orchestrator may be installed on either Windows or Linux based platforms. The certificate operations supported by a capability may vary based what platform the capability is installed on. The table below indicates what capabilities are supported based on which platform the encompassing Universal Orchestrator is running.
+| Operation | Win | Linux |
+|-----|-----|------|
+|Supports Management Add|&check; |  |
+|Supports Management Remove|&check; |  |
+|Supports Create Store|  |  |
+|Supports Discovery|  |  |
+|Supports Renrollment|  |  |
+|Supports Inventory|&check; |  |
+
+
+
+---
+
 **Bosch Camera Configuration**
 
 **Overview**
 
 The Bosch IP Camera Orchestrator remotely manages certificates on the camera.
 
-This agent implements three job types – Inventory, Reenrollment and Remove. Below are the steps necessary to configure this AnyAgent.
+This agent implements three job types – Inventory, Reenrollment and Remove. Below are the steps necessary to configure this AnyAgent..
 
 **Bosch IP Camera Configuration**
 
