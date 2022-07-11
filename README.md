@@ -80,7 +80,7 @@ Entry Parameters|None required| N/A
 
 
 **2. Register the BoschIPCamera Universal Orchestrator with Keyfactor**
-See Keyfactor "Installing Keyfactor Orchestrators" Documentation, available from your Keyfactor contact/representative.
+Within Windows File Explorer, navigate to the Keyfactor Orchestrator installation folder (usually C:\Program Files\Keyfactor\Keyfactor Orchestrator), find the "extensions" folder, and under that create a new folder named "BoschIPCamera". Under the BoschIPCamera folder copy all of the files from the downloaded release to this location.
 
 **3. Create a Bosch IP Camera Store within Keyfactor Command**
 
