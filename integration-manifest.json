@@ -1,7 +1,30 @@
 {
-    "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
-    "integration_type": "orchestrator",
-    "name": "BoschIPcamera",
-    "status": "Prototype",
-    "description": "Bosch IP Camera Orchestrator for Add, Remove and Inventory."
+  "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
+  "integration_type": "orchestrator",
+  "name": "Bosch IP Camera",
+  "status": "prototype",
+  "link_github": true,
+  "description": "Bosch IP Camera Orchestrator for Add, Remove and Inventory",
+  "about": {
+    "orchestrator": {
+      "win": {
+        "supportsCreateStore": false,
+        "supportsDiscovery": false,
+        "supportsManagementAdd": true,
+        "supportsManagementRemove": true,
+        "supportsReenrollment": false,
+        "supportsInventory": true,
+        "platformSupport": "Unused"
+      },
+      "linux": {
+        "supportsCreateStore": false,
+        "supportsDiscovery": false,
+        "supportsManagementAdd": false,
+        "supportsManagementRemove": false,
+        "supportsReenrollment": false,
+        "supportsInventory": false,
+        "platformSupport": "Unused"
+      }
+    }
+  }
 }
