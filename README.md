@@ -46,7 +46,7 @@ This agent implements three job types – Inventory, Reenrollment and Remove. Be
 ![](images/Bosch_Security_Systems.gif)
 2. Initial design is using HTTP because we don't have a trusted cert on the camera to use HTTPS. Further invenstigaion with prospects/customers will help us identify if we need to switch to HTTPS after the initial certificate is installed.
 3. Currently supports Bosch firmware version 7.10.0095 - 7.82. Has not been tested with any other firmeware version.
-4. The Camereas only support SHA256.
+4. The Cameras only support SHA256.
 
 **1. Create the New Certificate Store Type for the Bosch IP Camera Universal Orchestrator**
 
