@@ -16,14 +16,19 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
     {
         private static Dictionary<string, string> _sCsrSubject = new Dictionary<string, string>();
         private readonly string _cameraUrl;
+        private readonly string _baseUrl;
         private readonly HttpClient _client;
         private readonly ILogger _logger;
         private HttpResponseMessage _response;
+        private readonly string _userName;
+        private readonly string _password;
+
 
         public BoschIpCameraClient(string cameraHostUrl, string userName, string password,
             Dictionary<string, string> csrSubject,
             ILogger logger)
         {
+            _baseUrl = $"https://{cameraHostUrl}";
             _cameraUrl = $"https://{cameraHostUrl}/rcp.xml?";
 
             //This will ignore certificate errors in test mode since we don't have a valid cert for the camera on the public IP
@@ -32,9 +37,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
             };
 
-            var cameraUsername = userName;
-            var cameraPassword = password;
-            var credentials = $"{cameraUsername}:{cameraPassword}";
+            _userName = userName;
+            _password = password;
+            var credentials = $"{_userName}:{password}";
             var encodedCredentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(credentials));
 
             _client = new HttpClient(handler);
@@ -44,7 +49,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             _logger = logger;
         }
 
-        public Dictionary<string, string> ListCerts(string url, string user, string pass)
+        public Dictionary<string, string> ListCerts()
         {
             var request = new HttpRequestMessage(HttpMethod.Get, _cameraUrl)
             {
@@ -57,7 +62,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             var files = new Dictionary<string, string>();
             foreach (var c in cameras)
             {
-                Download(url, user, pass, c).Wait();
+                Download(c,_userName,_password).Wait();
                 files.Add(c, _response.Content.ReadAsStringAsync().Result);
             }
 
@@ -141,7 +146,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 {
                     Thread.Sleep(5000);
                     count++;
-                    Download(cameraHostUrl, userName, password, certName, "?type=csr").Wait();
+                    Download(_userName, _password, certName, "?type=csr").Wait();
                     // _logger.LogInformation("CSR downloaded successfully for " + certName);
                     haveCsr = true;
                     return _response.Content.ReadAsStringAsync().Result;
@@ -155,23 +160,18 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             return null;
         }
 
-        private async Task Download(string cameraHostUrl, string userName, string password, string certName,
+        private async Task Download(string certName,string userName,string password,
             string paramString = "")
         {
             var source = new CancellationTokenSource();
             var token = source.Token;
 
             _logger.LogTrace("Initializing HttpClient for CSR Download");
-            var cameraUrl = $"http://{cameraHostUrl}/cert_download/{certName.Replace(" ", "%20")}.pem{paramString}";
+            var cameraUrl = $"{_baseUrl}/cert_download/{certName.Replace(" ", "%20")}.pem{paramString}";
             _logger.LogTrace("Camera URL: " + cameraUrl);
 
-            using var httpClient = new HttpClient();
-            var credentials = new NetworkCredential(userName, password);
-            httpClient.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Digest", credentials.ToString());
+            _response = await _client.GetAsync(cameraUrl, token);
 
-            var response = await httpClient.GetAsync(cameraUrl, token);
-            _ = await response.Content.ReadAsStringAsync();
         }
 
 

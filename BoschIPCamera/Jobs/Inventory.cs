@@ -32,8 +32,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             //setup the Camera Details
             _logger.LogDebug("Build default RestSharp client");
 
-            var files = client.ListCerts(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
-                jobConfiguration.ServerPassword);
+            var files = client.ListCerts();
             var inventory = files.Select(f => new CurrentInventoryItem()
             {
                 Alias = f.Key,
