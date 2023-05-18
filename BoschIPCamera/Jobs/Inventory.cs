@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client;
@@ -26,23 +25,22 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         {
             _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace($"Inventory Config {JsonConvert.SerializeObject(jobConfiguration)}");
-            boschIPCameraDetails storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
-            BoschIPcameraClient client = new BoschIPcameraClient();
+            JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
+            var client = new BoschIpCameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
+                jobConfiguration.ServerPassword, null, _logger);
 
             //setup the Camera Details
             _logger.LogDebug("Build default RestSharp client");
-            client.setupStandardBoschIPcameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
-                jobConfiguration.ServerPassword, null, _logger);
 
-            Dictionary<String, String> files = client.listCerts(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
+            var files = client.ListCerts(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
                 jobConfiguration.ServerPassword);
-            List<CurrentInventoryItem> inventory = files.Select(f => new CurrentInventoryItem()
+            var inventory = files.Select(f => new CurrentInventoryItem()
             {
                 Alias = f.Key,
                 Certificates = new List<string>() { f.Value },
                 PrivateKeyEntry = false,
                 UseChainLevel = false
-            }).ToList<CurrentInventoryItem>();
+            }).ToList();
             
             // In the model where a bosch certstore represents just a single cert, this list needs to be trimmed.
             // inventory = inventory.Where(i => i.Alias == jobConfiguration.CertificateStoreDetails.StorePath).ToList();

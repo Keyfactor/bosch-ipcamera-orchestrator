@@ -199,7 +199,7 @@ namespace BoschIPCameraTestConsole
             //  ILoggerFactory invLoggerFactory = new LoggerFactory();
             //   ILogger<Reenrollment> invLogger = invLoggerFactory.CreateLogger<Reenrollment>();
 
-            BoschIPcameraClient client = new BoschIPcameraClient();
+            //BoschIpCameraClient client = new BoschIpCameraClient();
             String returnCode = "";
 
             //generate the CSR on the camera
@@ -207,9 +207,9 @@ namespace BoschIPCameraTestConsole
             //client.setupStandardBoschIPcameraClient("166.145.144.73:10080", "service", "DHStrp2022!", setupCSRSubject());
 
             //delete cert if it exists
-            //returnCode = client.deleteCertByName("keyfactor");
+            //returnCode = client.DeleteCertByName("keyfactor");
 
-            //    returnCode = client.certCreate("keyfactor");
+            //    returnCode = client.CertCreate("keyfactor");
 
             if (returnCode == "pass")
             {
@@ -226,12 +226,12 @@ namespace BoschIPCameraTestConsole
             if (returnCode == "pass")
             {
                 //set cert usage
-           //   returnCode = client.setCertUsage("HTTPSCert", "80000000");
+           //   returnCode = client.SetCertUsage("HTTPSCert", "80000000");
 
                 if (returnCode == "pass")
                 {
                     //reboot camera
-              //      returnCode = client.rebootCamera();
+              //      returnCode = client.RebootCamera();
                 }
             }
 

@@ -6,23 +6,22 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.Net;
-using System.Net.Security;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using System.Threading;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
     // Structure of KeyfactorAPI/Enrollment/CSR response
-    struct enrollResponse
+    struct EnrollResponse
     {
         public certificateInformation CertificateInformation;
-        public Dictionary<String, Object> Metadata;
+        public Dictionary<string, object> Metadata;
     }
 
     // Nested structure within KeyfactorAPI/Enrollment/CSR response
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     struct certificateInformation
     {
         public string SerialNumber;
@@ -36,6 +35,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         public string EnrollmentContext;
     }
 
+    [SuppressMessage("ReSharper", "InconsistentNaming")]
     struct boschIPCameraDetails
     {
         public string CN;
@@ -62,12 +62,15 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         {
             _logger.LogTrace("Starting Cert upload to camera " + host);
             
-            string boundary = "----------" + DateTime.Now.Ticks.ToString("x");
-            string fileHeader = string.Format("Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{0}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n", fileName);
-            CredentialCache credCache = new CredentialCache();
-            credCache.Add(new Uri("http://" + host), "Digest", new NetworkCredential(username, password));
+            var boundary = "----------" + DateTime.Now.Ticks.ToString("x");
+            var fileHeader =
+                $"Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{fileName}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n";
+            var credCache = new CredentialCache
+            {
+                {new Uri("http://" + host), "Digest", new NetworkCredential(username, password)}
+            };
 
-            HttpWebRequest authRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
+            var authRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
             authRequest.Method = "GET";
             authRequest.Credentials = credCache;
             authRequest.PreAuthenticate = true;
@@ -75,43 +78,42 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             try
             {
                 _logger.LogTrace("Get Auth call to camera on " + host);
-                WebResponse response = authRequest.GetResponse();
+                authRequest.GetResponse();
             }
             catch (Exception e)
             {
                 _logger.LogError(e.Message);
             }
 
-            bool certOnCamera = false;
-            int count = 0;
+            var count = 0;
             //keep trying until we get the cert on camera or try 5 times
-            while (!certOnCamera && count <= 5)
+            while (count <= 5)
             {
                 try
                 {
                     count++;
                     _logger.LogTrace("Post call to camera on " + host);
-                    HttpWebRequest httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
+                    var httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
                     httpWebRequest.Credentials = credCache;
                     httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
                     httpWebRequest.Method = "POST";
                     //httpWebRequest.PreAuthenticate = true;
 
-                    Stream requestStream = httpWebRequest.GetRequestStream();
+                    var requestStream = httpWebRequest.GetRequestStream();
                     WriteToStream(requestStream, "--" + boundary + "\r\n");
                     WriteToStream(requestStream, fileHeader);
                     WriteToStream(requestStream, fileData);
                     WriteToStream(requestStream, "\r\n--" + boundary + "--\r\n");
                     //requestStream.Close();
 
-                    HttpWebResponse myHttpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
+                    var myHttpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
 
 
-                    Stream responseStream = myHttpWebResponse.GetResponseStream();
+                    var responseStream = myHttpWebResponse.GetResponseStream();
 
-                    StreamReader myStreamReader = new StreamReader(responseStream, Encoding.Default);
+                    var myStreamReader = new StreamReader(responseStream ?? throw new InvalidOperationException(), Encoding.Default);
 
-                    string pageContent = myStreamReader.ReadToEnd();
+                    myStreamReader.ReadToEnd();
 
                     myStreamReader.Close();
                     responseStream.Close();
@@ -129,7 +131,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
         private static void WriteToStream(Stream s, string txt)
         {
-            byte[] bytes = Encoding.UTF8.GetBytes(txt);
+            var bytes = Encoding.UTF8.GetBytes(txt);
             s.Write(bytes, 0, bytes.Length);
         }
 
@@ -137,60 +139,48 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         {
             if (skipCertCheck)
             {
-                ServicePointManager.ServerCertificateValidationCallback = delegate (
-                Object obj, X509Certificate certificate, X509Chain chain,
-                SslPolicyErrors errors)
-                {
-                    return ( true );
-                };
+                ServicePointManager.ServerCertificateValidationCallback = (obj, certificate, chain, errors) => (true);
             }
-            string target;
-            if (url.StartsWith("http"))
-            {
-                target = url;
-            }
-            else
-            {
-                target = $"https://{url}";
-            }
-            WebRequest req = WebRequest.Create(target);
+
+            var target = url.StartsWith("http") ? url : $"https://{url}";
+            var req = WebRequest.Create(target);
             req.Method = method;
-            string auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{user}:{pass}"));
+            var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{user}:{pass}"));
             req.Headers.Add("Authorization", $"Basic {auth}");
             req.Headers.Add("X-Keyfactor-Requested-With", "APIClient");
             if (method == "POST")
             {
-                byte[] body = Encoding.ASCII.GetBytes(bodyStr);
+                var body = Encoding.ASCII.GetBytes(bodyStr);
                 req.ContentLength = body.Length;
                 req.ContentType = "application/json";
-                using (Stream s = req.GetRequestStream())
-                {
-                    s.Write(body, 0, body.Length);
-                    s.Close();
-                }
+                using var s = req.GetRequestStream();
+                s.Write(body, 0, body.Length);
+                s.Close();
             }
-            Stream responseStream = req.GetResponse().GetResponseStream();
-            string resp = new StreamReader(responseStream).ReadToEnd();
-            T respObj = JsonConvert.DeserializeObject<T>(resp);
+            var responseStream = req.GetResponse().GetResponseStream();
+            var resp = new StreamReader(responseStream ?? throw new InvalidOperationException()).ReadToEnd();
+            var respObj = JsonConvert.DeserializeObject<T>(resp);
             return respObj;
         }
 
         // Format parameters and make web request to Keyfactor Enrollment API, returning the resulting certificate
-        private string enrollCertificate(string CSR, string keyfactorHost, string keyfactorUser, string keyfactorPassword, string CAFullname, string templateShortname)
+/*
+        private string EnrollCertificate(string csr, string keyfactorHost, string keyfactorUser, string keyfactorPassword, string caFullname, string templateShortname)
         {
             // CA fullname must have four backslashes (e.g. "keyfactor.local\\\\MY-CA-LOGICAL-NAME") to accommodate double-escaped JSON. Adjust if needed.
-            if (!CAFullname.Contains("\\\\")) {
-                CAFullname = CAFullname.Replace("\\", "\\\\");
+            if (!caFullname.Contains("\\\\")) {
+                caFullname = caFullname.Replace("\\", "\\\\");
             }
 
             // Format API endpoint
-            string keyfactorAPIEndpoint = keyfactorHost + "/KeyfactorAPI/Enrollment/CSR";
+            var keyfactorApiEndpoint = keyfactorHost + "/KeyfactorAPI/Enrollment/CSR";
 
             // Form CSR enrollment body with given CSR, CA, template, and keyfactor access info, with no SANs or metadata, and using current timestamp
-            string body = $"{{\"CSR\": \"{CSR}\",\"CertificateAuthority\": \"{CAFullname}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{templateShortname}\"}}";
-            enrollResponse resp = MakeWebRequest<enrollResponse>(keyfactorAPIEndpoint, keyfactorUser, keyfactorPassword, body);
+            var body = $"{{\"CSR\": \"{csr}\",\"CertificateAuthority\": \"{caFullname}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{templateShortname}\"}}";
+            var resp = MakeWebRequest<EnrollResponse>(keyfactorApiEndpoint, keyfactorUser, keyfactorPassword, body);
             return resp.CertificateInformation.Certificates[0];
         }
+*/
 
         public Reenrollment(ILogger<Reenrollment> logger)
         {
@@ -200,10 +190,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         public JobResult ProcessJob(ReenrollmentJobConfiguration jobConfiguration, SubmitReenrollmentCSR submitReenrollmentUpdate)
         {
             _logger.MethodEntry(LogLevel.Debug);
-            return PerformReenrollment(jobConfiguration, submitReenrollmentUpdate);
+            return PerformReenrollment(jobConfiguration);
         }
 
-        private JobResult PerformReenrollment(ReenrollmentJobConfiguration jobConfiguration, SubmitReenrollmentCSR submitReenrollmentUpdate)
+        private JobResult PerformReenrollment(ReenrollmentJobConfiguration jobConfiguration)
         {
 
             try
@@ -213,18 +203,15 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
                 _logger.MethodEntry(LogLevel.Debug);
                 _logger.LogTrace($"Reenrollment Config {JsonConvert.SerializeObject(jobConfiguration)}");
-                boschIPCameraDetails storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
-                BoschIPcameraClient client = new BoschIPcameraClient();
-
+                var storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
                 //setup the CSR details
-                Dictionary<string, string> csrSubject = setupCSRSubject(storeProperties);
+                var csrSubject = SetupCsrSubject(storeProperties);
 
-                //setup the Camera Details
-                client.setupStandardBoschIPcameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
+                var client = new BoschIpCameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
                     jobConfiguration.ServerPassword, csrSubject, _logger);
 
                 //delete existing certificate
-                string returnCode = client.deleteCertByName(jobConfiguration.CertificateStoreDetails.StorePath);
+                var returnCode = client.DeleteCertByName(jobConfiguration.CertificateStoreDetails.StorePath);
 
                 if (returnCode != "pass")
                 {
@@ -233,7 +220,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
 
                 //generate the CSR on the camera
-                returnCode = client.certCreate(jobConfiguration.CertificateStoreDetails.StorePath);
+                returnCode = client.CertCreate(jobConfiguration.CertificateStoreDetails.StorePath);
 
                 if (returnCode != "pass")
                 {
@@ -242,22 +229,22 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
 
                 //get the CSR from the camera
-                string responseContent = client.downloadCSRFromCamera(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
+                var responseContent = client.DownloadCsrFromCamera(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
                     jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath);
                 _logger.LogDebug("Downloaded CSR: " + responseContent);
               
                 //sign CSR in Keyfactor
-                string body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"{storeProperties.CA}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{storeProperties.template}\"}}";
-                enrollResponse resp = MakeWebRequest<enrollResponse>(storeProperties.keyfactorHost+"/KeyfactorAPI/Enrollment/CSR", storeProperties.keyfactorUser, jobConfiguration.CertificateStoreDetails.StorePassword, body, skipCertCheck: true);
-                string cert = resp.CertificateInformation.Certificates[0];
-                cert = cert.Substring(cert.IndexOf("-----"));
+                var body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"{storeProperties.CA}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow:s}\",  \"Template\": \"{storeProperties.template}\"}}";
+                var resp = MakeWebRequest<EnrollResponse>(storeProperties.keyfactorHost+"/KeyfactorAPI/Enrollment/CSR", storeProperties.keyfactorUser, jobConfiguration.CertificateStoreDetails.StorePassword, body, skipCertCheck: true);
+                var cert = resp.CertificateInformation.Certificates[0];
+                cert = cert.Substring(cert.IndexOf("-----", StringComparison.Ordinal));
                 _logger.LogDebug(cert);
 
                 //upload the signed cert to the camera
                 UploadSync(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername, jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath+".cer", cert);
 
                 //turn on 802.1x - "1" is on
-                returnCode = client.change8021xSettings("1");
+                returnCode = client.Change8021XSettings("1");
                 if (returnCode != "pass")
                 {
                      sb.Append("Error setting 802.1x to on for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
@@ -265,7 +252,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
 
                 //set cert usage
-                returnCode = client.setCertUsage(jobConfiguration.CertificateStoreDetails.StorePath, storeProperties.certUsage);
+                returnCode = client.SetCertUsage(jobConfiguration.CertificateStoreDetails.StorePath, storeProperties.certUsage);
                 if (returnCode != "pass")
                 {
                     sb.Append("Error setting certUsage of " + storeProperties.certUsage + "for store path " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
@@ -273,7 +260,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
 
                 //reboot the camera
-                client.rebootCamera();
+                client.RebootCamera();
                 if (returnCode != "pass")
                 {
                     sb.Append("Error rebooting camera " + jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
@@ -293,16 +280,18 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             }
             
         }
-        private Dictionary<string, string> setupCSRSubject(boschIPCameraDetails storeProperties)
+        private Dictionary<string, string> SetupCsrSubject(boschIPCameraDetails storeProperties)
         {
-            Dictionary<string, string> csrSubject = new Dictionary<string, string>();
+            var csrSubject = new Dictionary<string, string>
+            {
+                {"C", storeProperties.country},
+                {"ST", storeProperties.state},
+                {"L", storeProperties.city},
+                {"O", storeProperties.org},
+                {"OU", storeProperties.OU},
+                {"CN", storeProperties.CN}
+            };
 
-            csrSubject.Add("C", storeProperties.country);
-            csrSubject.Add("ST", storeProperties.state);
-            csrSubject.Add("L", storeProperties.city);
-            csrSubject.Add("O", storeProperties.org);
-            csrSubject.Add("OU", storeProperties.OU);
-            csrSubject.Add("CN", storeProperties.CN);
 
             return csrSubject;
         }

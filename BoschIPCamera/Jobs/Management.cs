@@ -1,6 +1,4 @@
-﻿using System;
-
-using Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client;
+﻿using Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Extensions;
 using Microsoft.Extensions.Logging;
@@ -37,17 +35,16 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         public JobResult removeCert(ManagementJobConfiguration jobConfiguration)
         {
             _logger.LogTrace($"Management Config {JsonConvert.SerializeObject(jobConfiguration)}");
-            boschIPCameraDetails storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
-            BoschIPcameraClient client = new BoschIPcameraClient();
+            JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
+            BoschIpCameraClient client = new BoschIpCameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
+                jobConfiguration.ServerPassword, null, _logger);
 
             //setup the Camera Details
             _logger.LogDebug("Build default RestSharp client");
-            client.setupStandardBoschIPcameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
-                jobConfiguration.ServerPassword, null, _logger);
 
             //delete existing certificate
             _logger.LogDebug("Delete existing cert " + jobConfiguration.CertificateStoreDetails.StorePath);
-            string returnCode = client.deleteCertByName(jobConfiguration.CertificateStoreDetails.StorePath);
+            string returnCode = client.DeleteCertByName(jobConfiguration.CertificateStoreDetails.StorePath);
 
             if (returnCode == "fail")
             {

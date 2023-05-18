@@ -1,382 +1,398 @@
 ﻿using System;
 using System.Collections.Generic;
-using RestSharp;
-using System.Threading.Tasks;
-using RestSharp.Authenticators.Digest;
-using System.Threading;
+using System.Net;
+using System.Net.Http;
+using System.Net.Http.Headers;
 using System.ServiceModel;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Xml;
 using Microsoft.Extensions.Logging;
-using Keyfactor.Logging;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 {
-    public class BoschIPcameraClient
+    public class BoschIpCameraClient
     {
-        private static Dictionary<string, string> s_csrSubject = new Dictionary<string, string>();
-        private string _cameraURL;
-        private RestClient _client = null;
-        private RestResponse _response = null;
-        private ILogger _logger;
+        private static Dictionary<string, string> _sCsrSubject = new Dictionary<string, string>();
+        private readonly string _cameraUrl;
+        private readonly HttpClient _client;
+        private readonly ILogger _logger;
+        private HttpResponseMessage _response;
 
-        public void setupStandardBoschIPcameraClient(string cameraHostURL, string userName, string password, Dictionary<string, string> csrSubject,
+        public BoschIpCameraClient(string cameraHostUrl, string userName, string password,
+            Dictionary<string, string> csrSubject,
             ILogger logger)
         {
-            ///_logger.LogTrace("Initializing RestSharp Client");
-            _cameraURL = "http://" + cameraHostURL + "/rcp.xml?";
-            //_logger.LogTrace("Camera URL: " + _cameraURL);
+            _cameraUrl = $"https://{cameraHostUrl}/rcp.xml?";
 
-            _client = new RestClient(_cameraURL)
+            //This will ignore certificate errors in test mode since we don't have a valid cert for the camera on the public IP
+            var handler = new HttpClientHandler
             {
-                Authenticator = new DigestAuthenticator(userName, password)
+                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
             };
 
-            s_csrSubject = csrSubject;
+            var cameraUsername = userName;
+            var cameraPassword = password;
+            var credentials = $"{cameraUsername}:{cameraPassword}";
+            var encodedCredentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(credentials));
+
+            _client = new HttpClient(handler);
+            _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", encodedCredentials);
+
+            _sCsrSubject = csrSubject;
             _logger = logger;
         }
 
-        public Dictionary<String,String> listCerts(string URL, string user, string pass)
+        public Dictionary<string, string> ListCerts(string url, string user, string pass)
         {
-            CancellationTokenSource source = new CancellationTokenSource();
-            CancellationToken token = source.Token;
-
-            var request = new RestRequest()
-                .AddQueryParameter("command", "0x0BEB")
-                .AddQueryParameter("type", "P_OCTET")
-                .AddQueryParameter("direction", "READ")
-                .AddQueryParameter("num", "1");
-
-            string requestValue = request.Resource;
-
-            Task<RestResponse> task = _client.GetAsync(request, token);
-            task.Wait();
-            List<String> strs = getCameraCertList(task.Result.Content);
-            Dictionary<String, String> files = new Dictionary<string, string>();
-            foreach(string s in strs)
+            var request = new HttpRequestMessage(HttpMethod.Get, _cameraUrl)
             {
-                download(URL, user, pass, s).Wait();
-                files.Add(s, _response.Content);
+                RequestUri = new Uri(_cameraUrl + "command=0x0BEB&type=P_OCTET&direction=READ&num=1")
+            };
+
+            var task = _client.SendAsync(request);
+            task.Wait();
+            var cameras = GetCameraCertList(task.Result.Content.ReadAsStringAsync().Result);
+            var files = new Dictionary<string, string>();
+            foreach (var c in cameras)
+            {
+                Download(url, user, pass, c).Wait();
+                files.Add(c, _response.Content.ReadAsStringAsync().Result);
             }
-            
+
             return files;
         }
 
         //need to think through the parameters sent in here
-        public string certCreate(string certificateName)
+        public string CertCreate(string certificateName)
         {
-            string myCommon = HexadecimalEncoding.ToHexWithPadding(s_csrSubject["CN"]);
-            string myOrg = HexadecimalEncoding.ToHexWithPadding(s_csrSubject["O"]);
-            string myUnit = HexadecimalEncoding.ToHexWithPadding(s_csrSubject["OU"]);
-            string myCountry = HexadecimalEncoding.ToHexWithPadding(s_csrSubject["C"]);
-            string myCity = HexadecimalEncoding.ToHexWithPadding(s_csrSubject["L"]);
-            string myProvince = HexadecimalEncoding.ToHexWithPadding(s_csrSubject["ST"]);
-            string myId = HexadecimalEncoding.ToHexNoPadding(certificateName);
-
-            string payload = HexadecimalEncoding.ToHexWithPrefix(certificateName, 4, '0') + "0000" + myId + "0008000100000001000800020000" + "0000";
-
-            payload = payload + HexadecimalEncoding.ToHexStringLengthWithPadding(s_csrSubject["CN"], 4, '0') + "0005" + myCommon;
-            payload = payload + HexadecimalEncoding.ToHexStringLengthWithPadding(s_csrSubject["O"], 4, '0') + "0006" + myOrg;
-            payload = payload + HexadecimalEncoding.ToHexStringLengthWithPadding(s_csrSubject["OU"], 4, '0') + "0007" + myUnit;
-            payload = payload + HexadecimalEncoding.ToHexStringLengthWithPadding(s_csrSubject["L"], 4, '0') + "0008" + myCity;
-            payload = payload + HexadecimalEncoding.ToHexStringLengthWithPadding(s_csrSubject["C"], 4, '0') + "0009" + myCountry;
-            payload = payload + HexadecimalEncoding.ToHexStringLengthWithPadding(s_csrSubject["ST"], 4, '0') + "000A" + myProvince;
-           // _logger.LogTrace("Payload for CSR request: " + payload);
-
             try
             {
-                generateCSROnCameraAsync(payload).Wait();
-                String returnCode = parseCameraResponse(_response.Content);
+                var myCommon = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["CN"]);
+                var myOrg = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["O"]);
+                var myUnit = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["OU"]);
+                var myCountry = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["C"]);
+                var myCity = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["L"]);
+                var myProvince = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["ST"]);
+                var myId = HexadecimalEncoding.ToHexNoPadding(certificateName);
+
+                var payload =
+                    $"{HexadecimalEncoding.ToHexWithPrefix(certificateName, 4, '0')}0000{myId}00080001000000010008000200000000";
+                payload +=
+                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["CN"], 4, '0')}0005{myCommon}";
+                payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["O"], 4, '0')}0006{myOrg}";
+                payload +=
+                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["OU"], 4, '0')}0007{myUnit}";
+                payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["L"], 4, '0')}0008{myCity}";
+                payload +=
+                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["C"], 4, '0')}0009{myCountry}";
+                payload +=
+                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["ST"], 4, '0')}000A{myProvince}";
+
+                GenerateCsrOnCameraAsync(payload).Wait();
+                var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);
                 if (returnCode != null)
                 {
-                    _logger.LogError("Camera failed to generate CSR with error code " + returnCode);
+                    _logger.LogError($"Camera failed to generate CSR with error code {returnCode}");
                     return returnCode;
                 }
-                _logger.LogInformation("CSR call completed successfully for " + certificateName);
+
+                _logger.LogInformation($"CSR call completed successfully for {certificateName}");
                 return "pass";
-            } 
+            }
             catch (ProtocolException ex)
             {
-                _logger.LogError("CSR call failed with the following error: "+ ex.ToString());
+                _logger.LogError($"CSR call failed with the following error: {ex}");
                 return ex.ToString();
-            };
+            }
         }
 
 
         //Call the camera to generate a CSR
-        private async Task generateCSROnCameraAsync(string payload)
+        private static async Task GenerateCsrOnCameraAsync(string payload)
         {
-            CancellationTokenSource source = new CancellationTokenSource();
-            CancellationToken token = source.Token;
+            using var httpClient = new HttpClient();
+            var queryParams = new Dictionary<string, string>
+            {
+                {"command", "0x0BEC"},
+                {"type", "P_OCTET"},
+                {"direction", "WRITE"},
+                {"num", "1"},
+                {"payload", payload}
+            };
 
-            var request = new RestRequest()
-                .AddQueryParameter("command", "0x0BEC")
-                .AddQueryParameter("type", "P_OCTET")
-                .AddQueryParameter("direction", "WRITE")
-                .AddQueryParameter("num", "1")
-                .AddQueryParameter("payload", payload);
+            var queryString = new FormUrlEncodedContent(queryParams).ReadAsStringAsync();
+            var requestUri = "your_request_uri?" + await queryString;
 
-            string requestValue = request.Resource;
-
-            _response = await _client.GetAsync(request, token);
+            using var cancellationTokenSource = new CancellationTokenSource();
+            var token = cancellationTokenSource.Token;
+            var _ = await httpClient.GetAsync(requestUri, token);
         }
 
-        public string downloadCSRFromCamera(string cameraHostURL, string userName, string password, string certName)
+        public string DownloadCsrFromCamera(string cameraHostUrl, string userName, string password, string certName)
         {
-            _logger.LogTrace("Download " + certName + " CSR from Camera: " + _cameraURL);
-            bool haveCSR = false;
-            int count = 0;
+            _logger.LogTrace("Download " + certName + " CSR from Camera: " + _cameraUrl);
+            var haveCsr = false;
+            var count = 0;
             //keep trying until we get the cert or try 30 times (wait 5 seconds each time)
-            while (!haveCSR && count <= 30)
-            {
+            while (!haveCsr && count <= 30)
                 try
                 {
                     Thread.Sleep(5000);
                     count++;
-                    download(cameraHostURL, userName, password, certName,"?type=csr").Wait();
-                   // _logger.LogInformation("CSR downloaded successfully for " + certName);
-                    haveCSR = true;
-                    return _response.Content;
+                    Download(cameraHostUrl, userName, password, certName, "?type=csr").Wait();
+                    // _logger.LogInformation("CSR downloaded successfully for " + certName);
+                    haveCsr = true;
+                    return _response.Content.ReadAsStringAsync().Result;
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogTrace("CSR download failed with the following error: " + ex.ToString());
-                };
-            }
+                    _logger.LogTrace("CSR Download failed with the following error: " + ex);
+                }
 
-            _logger.LogError("Failed to download CSR");
+            _logger.LogError("Failed to Download CSR");
             return null;
         }
-        private async Task download(string cameraHostURL, string userName, string password, string certName, string paramString="")
+
+        private async Task Download(string cameraHostUrl, string userName, string password, string certName,
+            string paramString = "")
         {
-            CancellationTokenSource source = new CancellationTokenSource();
-            CancellationToken token = source.Token;
+            var source = new CancellationTokenSource();
+            var token = source.Token;
 
-            _logger.LogTrace("Initializing RestSharp Client for CSR Download");
-            string cameraURL = $"http://{cameraHostURL}/cert_download/{certName.Replace(" ", "%20")}.pem{paramString}";
-            _logger.LogTrace("Camera URL: " + cameraURL);
+            _logger.LogTrace("Initializing HttpClient for CSR Download");
+            var cameraUrl = $"http://{cameraHostUrl}/cert_download/{certName.Replace(" ", "%20")}.pem{paramString}";
+            _logger.LogTrace("Camera URL: " + cameraUrl);
 
-            RestClient client = new RestClient(cameraURL)
-            {
-                Authenticator = new DigestAuthenticator(userName, password)
-            };
+            using var httpClient = new HttpClient();
+            var credentials = new NetworkCredential(userName, password);
+            httpClient.DefaultRequestHeaders.Authorization =
+                new AuthenticationHeaderValue("Digest", credentials.ToString());
 
-            var request = new RestRequest();
-
-            _response = await client.GetAsync(request, token);
+            var response = await httpClient.GetAsync(cameraUrl, token);
+            _ = await response.Content.ReadAsStringAsync();
         }
 
+
         //Enable/Disable 802.1x setting on the camera
-        public string change8021xSettings(string onOffSwitch)
+        public string Change8021XSettings(string onOffSwitch)
         {
-            _logger.LogTrace("Changing Camera 802.1x setting to " + onOffSwitch + " on Camera: " + _cameraURL);
+            _logger.LogTrace("Changing Camera 802.1x setting to " + onOffSwitch + " on Camera: " + _cameraUrl);
 
             try
             {
-                change8021x(onOffSwitch).Wait();
-                String returnCode = parseCameraResponse(_response.Content);
+                Change8021X(onOffSwitch).Wait();
+                var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);
                 if (returnCode != null)
                 {
                     _logger.LogError("Camera failed to change 802.1x with error code " + returnCode);
                     return returnCode;
                 }
-                _logger.LogInformation("802.1x setting changed successfully for " + _cameraURL);
-                return "pass"; 
+
+                _logger.LogInformation("802.1x setting changed successfully for " + _cameraUrl);
+                return "pass";
             }
             catch (Exception ex)
             {
-                _logger.LogError("802.1x setting change failed with the following error: " + ex.ToString());
+                _logger.LogError("802.1x setting change failed with the following error: " + ex);
                 return ex.ToString();
-            };
+            }
         }
 
         //Enable/Disable 802.1x on the camera after the certs are in place
         //onOffSwitch - "0" means off, "1" means on
-        private async Task change8021x(string onOffSwitch)
+        private async Task Change8021X(string onOffSwitch)
         {
-            CancellationTokenSource source = new CancellationTokenSource();
-            CancellationToken token = source.Token;
+            var source = new CancellationTokenSource();
+            var token = source.Token;
 
-            var request = new RestRequest()
-                .AddQueryParameter("command", "0x09EB")
-                .AddQueryParameter("type", "T_OCTET")
-                .AddQueryParameter("direction", "WRITE")
-                .AddQueryParameter("num", "1")
-                .AddQueryParameter("payload", onOffSwitch);
+            var requestUri =
+                $"{_cameraUrl}command=0x09EB&type=T_OCTET&direction=WRITE&num=1&payload={Uri.EscapeDataString(onOffSwitch)}";
 
-            string requestValue = request.Resource;
+            var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
-            _response = await _client.GetAsync(request, token);
+            using var response = await _client.SendAsync(request, token);
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Request failed with status code {response.StatusCode}");
 
-            string responeValue = _response.Content;
+            _response = response;
         }
 
-        public string rebootCamera()
+
+        public string RebootCamera()
         {
-            _logger.LogTrace("Rebooting camera : " + _cameraURL);
+            _logger.LogTrace("Rebooting camera : " + _cameraUrl);
 
             try
             {
-                reboot().Wait();
-                String returnCode = parseCameraResponse(_response.Content);
-                if(returnCode != null)
-                {
-                    _logger.LogError("Camera failed to reboot with error code " + returnCode);
-                    return returnCode;
-                }
-                _logger.LogInformation("Camera rebooted sucessfully " + _cameraURL);
-                return "pass";     
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Failed to reboot Camera " + _cameraURL + " with the following error: " + ex.ToString());
-                return ex.ToString();
-            };
-        }
-
-        private async Task reboot()
-        {
-            CancellationTokenSource source = new CancellationTokenSource();
-            CancellationToken token = source.Token;
-
-            var request = new RestRequest()
-                .AddQueryParameter("command", "0x0811")
-                .AddQueryParameter("type", "F_FLAG")
-                .AddQueryParameter("direction", "WRITE")
-                .AddQueryParameter("num", "1")
-                .AddQueryParameter("payload", "1");
-
-            string requestValue = request.Resource;
-
-            _response = await _client.GetAsync(request, token);
-        }
-
-        //set the cert usage on a cert
-        public string setCertUsage(string certName, string usageCode)
-        {
-            _logger.LogTrace("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL);
-            String payload = "0x00080000" + usageCode;
-            string myId = HexadecimalEncoding.ToHexNoPadding(certName);
-            string additionalPayload = payload + HexadecimalEncoding.ToHex(certName, 4, '0') + "0001" + myId;
-
-            try
-            {
-                setCertUsage(additionalPayload).Wait();
-                string returnCode = parseCameraResponse(_response.Content);
+                Reboot().Wait();
+                var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);
                 if (returnCode != null)
                 {
-                    _logger.LogError("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL + " failed with error code " + returnCode);
+                    _logger.LogError("Camera failed to Reboot with error code " + returnCode);
                     return returnCode;
                 }
-                _logger.LogInformation("Successfully changed cert usage to " + usageCode + " for cert " + certName + " for camera " + _cameraURL);
+
+                _logger.LogInformation("Camera rebooted successfully " + _cameraUrl);
                 return "pass";
-            
             }
             catch (Exception ex)
             {
-                _logger.LogError("Cert usage change failed with the following error: " + ex.ToString());
+                _logger.LogError("Failed to Reboot Camera " + _cameraUrl + " with the following error: " + ex);
                 return ex.ToString();
-            };    
+            }
+        }
+
+        private async Task Reboot()
+        {
+            var source = new CancellationTokenSource();
+            var token = source.Token;
+
+            var requestUri = $"{_cameraUrl}command=0x0811&type=F_FLAG&direction=WRITE&num=1&payload=1";
+
+            var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+
+            using (var response = await _client.SendAsync(request, token))
+            {
+                if (!response.IsSuccessStatusCode)
+                    throw new Exception($"Request failed with status code {response.StatusCode}");
+
+                _response = response;
+            }
+        }
+
+
+        //set the cert usage on a cert
+        public string SetCertUsage(string certName, string usageCode)
+        {
+            _logger.LogTrace("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " +
+                             _cameraUrl);
+            var payload = "0x00080000" + usageCode;
+            var myId = HexadecimalEncoding.ToHexNoPadding(certName);
+            var additionalPayload = payload + HexadecimalEncoding.ToHex(certName, 4, '0') + "0001" + myId;
+
+            try
+            {
+                SetCertUsage(additionalPayload).Wait();
+                var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);
+                if (returnCode != null)
+                {
+                    _logger.LogError("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " +
+                                     _cameraUrl + " failed with error code " + returnCode);
+                    return returnCode;
+                }
+
+                _logger.LogInformation("Successfully changed cert usage to " + usageCode + " for cert " + certName +
+                                       " for camera " + _cameraUrl);
+                return "pass";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Cert usage change failed with the following error: " + ex);
+                return ex.ToString();
+            }
         }
 
         //can be used to reset/clear existing cert usage and to set cert usage on a specific cert
-        private async Task setCertUsage(string payload)
+        private async Task SetCertUsage(string payload)
         {
-            CancellationTokenSource source = new CancellationTokenSource();
-            CancellationToken token = source.Token;
+            var source = new CancellationTokenSource();
+            var token = source.Token;
 
-            var request = new RestRequest()
-                .AddQueryParameter("command", "0x0BF2")
-                .AddQueryParameter("type", "P_OCTET")
-                .AddQueryParameter("direction", "WRITE")
-                .AddQueryParameter("num", "1")
-                .AddQueryParameter("payload", payload);
+            var requestUri =
+                $"{_cameraUrl}command=0x0BF2&type=P_OCTET&direction=WRITE&num=1&payload={Uri.EscapeDataString(payload)}";
 
-            string requestValue = request.Resource;
+            var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
-            _response = await _client.GetAsync(request, token);
+            using var response = await _client.SendAsync(request, token);
+            if (!response.IsSuccessStatusCode)
+                throw new Exception($"Request failed with status code {response.StatusCode}");
 
+            _response = response;
         }
 
+
         //Delete the cert by name
-        public string deleteCertByName(string certName)
+        public string DeleteCertByName(string certName)
         {
-            _logger.LogTrace("Delete cert " + certName + " for camera " + _cameraURL);
-            string myId = HexadecimalEncoding.ToHexNoPadding(certName);
-            string payload = HexadecimalEncoding.ToHexWithPrefix(certName, 4, '0') + "0000" + myId + "0004000200080003000000FF";
+            _logger.LogTrace("Delete cert " + certName + " for camera " + _cameraUrl);
+            var myId = HexadecimalEncoding.ToHexNoPadding(certName);
+            var payload = HexadecimalEncoding.ToHexWithPrefix(certName, 4, '0') + "0000" + myId +
+                          "0004000200080003000000FF";
 
             try
             {
                 //first reset the cert usage
-                deleteCert(payload).Wait();
-                String returnCode = parseCameraResponse(_response.Content);
+                DeleteCert(payload).Wait();
+                var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);
                 if (returnCode != null)
                 {
-                    _logger.LogError("Deleting cert " + certName + " for camera " + _cameraURL + " failed with error code " + returnCode);
+                    _logger.LogError("Deleting cert " + certName + " for camera " + _cameraUrl +
+                                     " failed with error code " + returnCode);
                     return returnCode;
                 }
-                _logger.LogInformation("Successfully deleted cert " + certName + " for camera " + _cameraURL);
-                return "pass";  
+
+                _logger.LogInformation("Successfully deleted cert " + certName + " for camera " + _cameraUrl);
+                return "pass";
             }
             catch (Exception ex)
             {
-                _logger.LogError("Deleting cert failed with the following error: " + ex.ToString());
+                _logger.LogError("Deleting cert failed with the following error: " + ex);
                 return ex.ToString();
-            };   
+            }
         }
 
         //delete a cert on camera
-        private async Task deleteCert(string payload)
+        private async Task DeleteCert(string payload)
         {
-            CancellationTokenSource source = new CancellationTokenSource();
-            CancellationToken token = source.Token;
+            var source = new CancellationTokenSource();
+            var token = source.Token;
 
-            var request = new RestRequest()
-                .AddQueryParameter("command", "0x0BE9")
-                .AddQueryParameter("type", "P_OCTET")
-                .AddQueryParameter("direction", "WRITE")
-                .AddQueryParameter("num", "1")
-                .AddQueryParameter("payload", payload);
+            var requestUri = $"{_cameraUrl}command=0x0BE9&type=P_OCTET&direction=WRITE&num=1&payload={payload}";
 
-            string requestValue = request.Resource;
+            var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
-            _response = await _client.GetAsync(request, token);
+            using (var response = await _client.SendAsync(request, token))
+            {
+                if (!response.IsSuccessStatusCode)
+                    throw new Exception($"Request failed with status code {response.StatusCode}");
+
+                _response = response;
+            }
         }
 
+
         //returns error code if camera call fails, blank if successful
-        private string parseCameraResponse(String response)
+        private string parseCameraResponse(string response)
         {
-            String errorCode = null;
-            XmlDocument xmlResponse = new XmlDocument();
+            string errorCode = null;
+            var xmlResponse = new XmlDocument();
             xmlResponse.LoadXml(response);
 
-            XmlNodeList errorList = xmlResponse.GetElementsByTagName("err");
-            if (errorList.Count > 0)
-            {
-                errorCode = errorList[0].InnerXml;
-            }
+            var errorList = xmlResponse.GetElementsByTagName("err");
+            if (errorList.Count > 0) errorCode = errorList[0].InnerXml;
             return errorCode;
         }
 
-        public List<String> getCameraCertList(String response)
+        public List<string> GetCameraCertList(string response)
         {
-            XmlDocument xmlResponse = new XmlDocument();
+            var xmlResponse = new XmlDocument();
             xmlResponse.LoadXml(response);
 
             // Parse raw hex content from the response
-            string s = 
+            var s =
                 xmlResponse.GetElementsByTagName("str")[0].InnerText
-                .Replace(" ", "")
-                .Replace("\r","")
-                .Replace("\n", "");
-            
+                    .Replace(" ", "")
+                    .Replace("\r", "")
+                    .Replace("\n", "");
+
             // Record structure starts with 2 bytes representing length of the record, followed by 6 more bytes, then filename, then a zero byte.
             // Iterate through records by reading length tag, extracting the filename in hex and converting.
-            List<String> certNames = new List<String>();
-            Func<string,int,string> getName = (s,start) => s.Substring(start, s.IndexOf("00", start) - start);
-            for (int i = 0; i < s.Length; i += Convert.ToInt32(s.Substring(i, 4), 16) * 2)
-            {
-                certNames.Add(HexadecimalEncoding.FromHex(getName(s,i+16)));
-            }
+            var certNames = new List<string>();
+            Func<string, int, string> getName = (s, start) => s.Substring(start, s.IndexOf("00", start) - start);
+            for (var i = 0; i < s.Length; i += Convert.ToInt32(s.Substring(i, 4), 16) * 2)
+                certNames.Add(HexadecimalEncoding.FromHex(getName(s, i + 16)));
             return certNames;
         }
     }
