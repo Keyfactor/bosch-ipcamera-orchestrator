@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.ServiceModel;
@@ -12,6 +11,8 @@ using Microsoft.Extensions.Logging;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 {
+    //todo better error handling and logging
+    //todo, low priority do we need a client library wrapper for bosch calls so we don't have to reference hex right in the main code and have it more readable as to what it is doing?
     public class BoschIpCameraClient
     {
         private static Dictionary<string, string> _sCsrSubject = new Dictionary<string, string>();
@@ -20,8 +21,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         private readonly HttpClient _client;
         private readonly ILogger _logger;
         private HttpResponseMessage _response;
-        private readonly string _userName;
-        private readonly string _password;
 
 
         public BoschIpCameraClient(string cameraHostUrl, string userName, string password,
@@ -37,9 +36,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
             };
 
-            _userName = userName;
-            _password = password;
-            var credentials = $"{_userName}:{password}";
+            var credentials = $"{userName}:{password}";
             var encodedCredentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(credentials));
 
             _client = new HttpClient(handler);
@@ -131,7 +128,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var cancellationTokenSource = new CancellationTokenSource();
             var token = cancellationTokenSource.Token;
-            var _response = await client.GetAsync(requestUri, token);
+            var _ = await client.GetAsync(requestUri, token);
         }
 
         public string DownloadCsrFromCamera(string certName)
@@ -144,6 +141,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             while (!haveCsr && count <= 30)
                 try
                 {
+                    //todo find a better way to do this or at least make sleep and count configurable
                     Thread.Sleep(5000);
                     count++;
                     Download(certName, "?type=csr").Wait();

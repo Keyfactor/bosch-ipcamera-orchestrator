@@ -14,6 +14,7 @@ using System.IO;
 using System.Net.Http;
 using Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs;
 
+//todo make this test console better or remove it, it is not too useful as is
 namespace BoschIPCameraTestConsole
 {
     struct enrollResponse
@@ -94,7 +95,7 @@ namespace BoschIPCameraTestConsole
                     }, null);
                     while (!y.IsCompleted)
                     {
-                        Thread.Sleep(1000);
+                        Thread.Sleep(1000); //todo better way to do this or make sleep configurable
                     }
                 }
                 catch (Exception e)
@@ -104,11 +105,11 @@ namespace BoschIPCameraTestConsole
             }, httpWebRequest);
             while (y == null || !y.IsCompleted)
             {
-                Thread.Sleep(100);
+                Thread.Sleep(100); //todo better way to do this or make sleep configurable
             }
             while (!x.IsCompleted)
             {
-                Thread.Sleep(100);
+                Thread.Sleep(100); //todo better way to do this or make sleep configurable
             }
         }
 

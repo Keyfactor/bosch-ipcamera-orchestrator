@@ -13,6 +13,13 @@ using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
+
+    //todo Use KF C# client library for this
+    //todo models should not be needed if KF Client Library is used for API
+    //todo better error handling and job failure recording (sometimes job fails but says success)
+    //todo convert to newest universal orchestrator framework with PAM support
+    //todo move some store custom filed to job entry parameters like CN and others related to the cert
+
     // Structure of KeyfactorAPI/Enrollment/CSR response
     struct EnrollResponse
     {
@@ -135,6 +142,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             s.Write(bytes, 0, bytes.Length);
         }
 
+        //todo Use KF c# client Library
         private static T MakeWebRequest<T>(string url, string user, string pass, string bodyStr, string method = "POST", bool skipCertCheck=false)
         {
             if (skipCertCheck)
@@ -162,25 +170,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             var respObj = JsonConvert.DeserializeObject<T>(resp);
             return respObj;
         }
-
-        // Format parameters and make web request to Keyfactor Enrollment API, returning the resulting certificate
-/*
-        private string EnrollCertificate(string csr, string keyfactorHost, string keyfactorUser, string keyfactorPassword, string caFullname, string templateShortname)
-        {
-            // CA fullname must have four backslashes (e.g. "keyfactor.local\\\\MY-CA-LOGICAL-NAME") to accommodate double-escaped JSON. Adjust if needed.
-            if (!caFullname.Contains("\\\\")) {
-                caFullname = caFullname.Replace("\\", "\\\\");
-            }
-
-            // Format API endpoint
-            var keyfactorApiEndpoint = keyfactorHost + "/KeyfactorAPI/Enrollment/CSR";
-
-            // Form CSR enrollment body with given CSR, CA, template, and keyfactor access info, with no SANs or metadata, and using current timestamp
-            var body = $"{{\"CSR\": \"{csr}\",\"CertificateAuthority\": \"{caFullname}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow.ToString("s")}\",  \"Template\": \"{templateShortname}\"}}";
-            var resp = MakeWebRequest<EnrollResponse>(keyfactorApiEndpoint, keyfactorUser, keyfactorPassword, body);
-            return resp.CertificateInformation.Certificates[0];
-        }
-*/
 
         public Reenrollment(ILogger<Reenrollment> logger)
         {
@@ -232,6 +221,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var responseContent = client.DownloadCsrFromCamera(jobConfiguration.CertificateStoreDetails.StorePath);
                 _logger.LogDebug("Downloaded CSR: " + responseContent);
               
+
+                //todo use Keyfactor C# client library
                 //sign CSR in Keyfactor
                 var body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"{storeProperties.CA}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow:s}\",  \"Template\": \"{storeProperties.template}\"}}";
                 var resp = MakeWebRequest<EnrollResponse>(storeProperties.keyfactorHost+"/KeyfactorAPI/Enrollment/CSR", storeProperties.keyfactorUser, jobConfiguration.CertificateStoreDetails.StorePassword, body, skipCertCheck: true);

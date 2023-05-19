@@ -9,6 +9,8 @@ using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
+    //todo better error handling and job failure recording (sometimes job fails but says success)
+    //todo convert to newest universal orchestrator framework with PAM support
     public class Inventory : IInventoryJobExtension
     {
         private readonly ILogger<Inventory> _logger;
