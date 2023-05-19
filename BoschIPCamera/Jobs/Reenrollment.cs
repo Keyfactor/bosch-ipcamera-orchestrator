@@ -67,10 +67,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 $"Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{fileName}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n";
             var credCache = new CredentialCache
             {
-                {new Uri("http://" + host), "Digest", new NetworkCredential(username, password)}
+                {new Uri("https://" + host), "Digest", new NetworkCredential(username, password)}
             };
 
-            var authRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
+            var authRequest = (HttpWebRequest)WebRequest.Create("https://" + host + "/upload.htm");
             authRequest.Method = "GET";
             authRequest.Credentials = credCache;
             authRequest.PreAuthenticate = true;
@@ -93,7 +93,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 {
                     count++;
                     _logger.LogTrace("Post call to camera on " + host);
-                    var httpWebRequest = (HttpWebRequest)WebRequest.Create("http://" + host + "/upload.htm");
+                    var httpWebRequest = (HttpWebRequest)WebRequest.Create("https://" + host + "/upload.htm");
                     httpWebRequest.Credentials = credCache;
                     httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
                     httpWebRequest.Method = "POST";
@@ -229,8 +229,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
 
                 //get the CSR from the camera
-                var responseContent = client.DownloadCsrFromCamera(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
-                    jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath);
+                var responseContent = client.DownloadCsrFromCamera(jobConfiguration.CertificateStoreDetails.StorePath);
                 _logger.LogDebug("Downloaded CSR: " + responseContent);
               
                 //sign CSR in Keyfactor

@@ -62,7 +62,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             var files = new Dictionary<string, string>();
             foreach (var c in cameras)
             {
-                Download(c,_userName,_password).Wait();
+                Download(c).Wait();
                 files.Add(c, _response.Content.ReadAsStringAsync().Result);
             }
 
@@ -95,7 +95,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 payload +=
                     $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["ST"], 4, '0')}000A{myProvince}";
 
-                GenerateCsrOnCameraAsync(payload).Wait();
+                GenerateCsrOnCameraAsync(payload,_cameraUrl,_client).Wait();
                 var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);
                 if (returnCode != null)
                 {
@@ -115,9 +115,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
 
         //Call the camera to generate a CSR
-        private static async Task GenerateCsrOnCameraAsync(string payload)
+        private static async Task GenerateCsrOnCameraAsync(string payload,string cameraUrl,HttpClient client)
         {
-            using var httpClient = new HttpClient();
             var queryParams = new Dictionary<string, string>
             {
                 {"command", "0x0BEC"},
@@ -128,39 +127,39 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             };
 
             var queryString = new FormUrlEncodedContent(queryParams).ReadAsStringAsync();
-            var requestUri = "your_request_uri?" + await queryString;
+            var requestUri = cameraUrl + await queryString;
 
-            using var cancellationTokenSource = new CancellationTokenSource();
+            var cancellationTokenSource = new CancellationTokenSource();
             var token = cancellationTokenSource.Token;
-            var _ = await httpClient.GetAsync(requestUri, token);
+            var _response = await client.GetAsync(requestUri, token);
         }
 
-        public string DownloadCsrFromCamera(string cameraHostUrl, string userName, string password, string certName)
+        public string DownloadCsrFromCamera(string certName)
         {
             _logger.LogTrace("Download " + certName + " CSR from Camera: " + _cameraUrl);
             var haveCsr = false;
             var count = 0;
+            string csrResult = null;
             //keep trying until we get the cert or try 30 times (wait 5 seconds each time)
             while (!haveCsr && count <= 30)
                 try
                 {
                     Thread.Sleep(5000);
                     count++;
-                    Download(_userName, _password, certName, "?type=csr").Wait();
-                    // _logger.LogInformation("CSR downloaded successfully for " + certName);
-                    haveCsr = true;
-                    return _response.Content.ReadAsStringAsync().Result;
+                    Download(certName, "?type=csr").Wait();
+                    csrResult= _response.Content.ReadAsStringAsync().Result;
+                    if (csrResult.Contains("-----BEGIN CERTIFICATE REQUEST-----"))
+                        haveCsr = true;
                 }
                 catch (Exception ex)
                 {
                     _logger.LogTrace("CSR Download failed with the following error: " + ex);
                 }
 
-            _logger.LogError("Failed to Download CSR");
-            return null;
+            return csrResult;
         }
 
-        private async Task Download(string certName,string userName,string password,
+        private async Task Download(string certName,
             string paramString = "")
         {
             var source = new CancellationTokenSource();
@@ -212,11 +211,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
-            using var response = await _client.SendAsync(request, token);
-            if (!response.IsSuccessStatusCode)
-                throw new Exception($"Request failed with status code {response.StatusCode}");
-
-            _response = response;
+            _response = await _client.SendAsync(request, token);
+            if (!_response.IsSuccessStatusCode)
+                throw new Exception($"Request failed with status code {_response.StatusCode}");
         }
 
 
@@ -253,13 +250,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
-            using (var response = await _client.SendAsync(request, token))
-            {
-                if (!response.IsSuccessStatusCode)
-                    throw new Exception($"Request failed with status code {response.StatusCode}");
+            _response = await _client.SendAsync(request, token);
+             if(!_response.IsSuccessStatusCode)
+                    throw new Exception($"Request failed with status code {_response.StatusCode}");
 
-                _response = response;
-            }
         }
 
 
@@ -305,11 +299,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
-            using var response = await _client.SendAsync(request, token);
-            if (!response.IsSuccessStatusCode)
-                throw new Exception($"Request failed with status code {response.StatusCode}");
-
-            _response = response;
+            _response = await _client.SendAsync(request, token);
+            if (!_response.IsSuccessStatusCode)
+                throw new Exception($"Request failed with status code {_response.StatusCode}");
         }
 
 
@@ -346,20 +338,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         //delete a cert on camera
         private async Task DeleteCert(string payload)
         {
-            var source = new CancellationTokenSource();
-            var token = source.Token;
-
             var requestUri = $"{_cameraUrl}command=0x0BE9&type=P_OCTET&direction=WRITE&num=1&payload={payload}";
-
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-
-            using (var response = await _client.SendAsync(request, token))
-            {
-                if (!response.IsSuccessStatusCode)
-                    throw new Exception($"Request failed with status code {response.StatusCode}");
-
-                _response = response;
-            }
+            _response = await _client.SendAsync(request);
         }
 
 
