@@ -7,6 +7,8 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
+using Keyfactor.Orchestrators.Extensions;
+using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
@@ -23,20 +25,24 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         private HttpResponseMessage _response;
 
 
-        public BoschIpCameraClient(string cameraHostUrl, string userName, string password,
+        public BoschIpCameraClient(JobConfiguration config, CertificateStore store, IPAMSecretResolver pam,
             Dictionary<string, string> csrSubject,
             ILogger logger)
         {
-            _baseUrl = $"https://{cameraHostUrl}";
-            _cameraUrl = $"https://{cameraHostUrl}/rcp.xml?";
+            _baseUrl = $"https://{store.ClientMachine}";
+            _cameraUrl = $"https://{store.ClientMachine}/rcp.xml?";
 
-            //This will ignore certificate errors in test mode since we don't have a valid cert for the camera on the public IP
+            // TODO: validate SSL cert
+            // This will ignore certificate errors in test mode since we don't have a valid cert for the camera on the public IP
             var handler = new HttpClientHandler
             {
                 ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
             };
 
-            var credentials = $"{userName}:{password}";
+            var username = ResolvePamField(pam, config.ServerUsername, "Server Username");
+            var password = ResolvePamField(pam, config.ServerPassword, "Server Password");
+
+            var credentials = $"{username}:{password}";
             var encodedCredentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(credentials));
 
             _client = new HttpClient(handler);
@@ -374,6 +380,12 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             for (var i = 0; i < s.Length; i += Convert.ToInt32(s.Substring(i, 4), 16) * 2)
                 certNames.Add(HexadecimalEncoding.FromHex(getName(s, i + 16)));
             return certNames;
+        }
+
+        private string ResolvePamField(IPAMSecretResolver pam, string key, string fieldName)
+        {
+            _logger.LogDebug($"Attempting to resolve PAM eligible field: '{fieldName}'");
+            return string.IsNullOrEmpty(key) ? key : pam.Resolve(key);
         }
     }
 }

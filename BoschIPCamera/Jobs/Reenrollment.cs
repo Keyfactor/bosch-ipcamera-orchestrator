@@ -2,6 +2,7 @@
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
+using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using System;
@@ -17,7 +18,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
     //todo Use KF C# client library for this
     //todo models should not be needed if KF Client Library is used for API
     //todo better error handling and job failure recording (sometimes job fails but says success)
-    //todo convert to newest universal orchestrator framework with PAM support
     //todo move some store custom filed to job entry parameters like CN and others related to the cert
 
     // Structure of KeyfactorAPI/Enrollment/CSR response
@@ -64,6 +64,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
     {
         public string ExtensionName => "BoschIPCamera";
         private readonly ILogger<Reenrollment> _logger;
+        private readonly IPAMSecretResolver _pam;
 
         private void UploadSync(string host, string username, string password, string fileName, string fileData)
         {
@@ -171,9 +172,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             return respObj;
         }
 
-        public Reenrollment(ILogger<Reenrollment> logger)
+        public Reenrollment(ILogger<Reenrollment> logger, IPAMSecretResolver pam)
         {
             _logger = logger;
+            _pam = pam;
         }
 
         public JobResult ProcessJob(ReenrollmentJobConfiguration jobConfiguration, SubmitReenrollmentCSR submitReenrollmentUpdate)
@@ -196,8 +198,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 //setup the CSR details
                 var csrSubject = SetupCsrSubject(storeProperties);
 
-                var client = new BoschIpCameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
-                    jobConfiguration.ServerPassword, csrSubject, _logger);
+                var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, csrSubject, _logger);
 
                 //delete existing certificate
                 // TODO: make checkbox to confirm overwrite?
