@@ -67,6 +67,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         }
 
         //need to think through the parameters sent in here
+        // TODO: parse subject parameters from plain subject field in reenrollment
         public string CertCreate(string certificateName)
         {
             try

@@ -200,6 +200,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                     jobConfiguration.ServerPassword, csrSubject, _logger);
 
                 //delete existing certificate
+                // TODO: make checkbox to confirm overwrite?
                 var returnCode = client.DeleteCertByName(jobConfiguration.CertificateStoreDetails.StorePath);
 
                 if (returnCode != "pass")
@@ -225,6 +226,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 //todo use Keyfactor C# client library
                 //sign CSR in Keyfactor
                 var body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"{storeProperties.CA}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow:s}\",  \"Template\": \"{storeProperties.template}\"}}";
+                // TODO: use Reenrollment arg to submit CSR instead of custom API call
                 var resp = MakeWebRequest<EnrollResponse>(storeProperties.keyfactorHost+"/KeyfactorAPI/Enrollment/CSR", storeProperties.keyfactorUser, jobConfiguration.CertificateStoreDetails.StorePassword, body, skipCertCheck: true);
                 var cert = resp.CertificateInformation.Certificates[0];
                 cert = cert.Substring(cert.IndexOf("-----", StringComparison.Ordinal));
@@ -234,6 +236,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 UploadSync(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername, jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath+".cer", cert);
 
                 //turn on 802.1x - "1" is on
+                // TODO: make 802.1X a setting in store / entry parameters ?
                 returnCode = client.Change8021XSettings("1");
                 if (returnCode != "pass")
                 {
@@ -242,6 +245,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
 
                 //set cert usage
+                // TODO: use readable names, multiple choice for Cert Usage, decode to correct HEX values based on constants
+                // TODO: change cert usage to entry parameter
                 returnCode = client.SetCertUsage(jobConfiguration.CertificateStoreDetails.StorePath, storeProperties.certUsage);
                 if (returnCode != "pass")
                 {
