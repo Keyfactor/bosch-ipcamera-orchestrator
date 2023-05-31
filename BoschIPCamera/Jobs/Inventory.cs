@@ -29,9 +29,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         {
             _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace($"Inventory Config {JsonConvert.SerializeObject(jobConfiguration)}");
-            JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
             _logger.LogTrace("Parsed Properties");
-            var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, null, _logger);
+            var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 
             //setup the Camera Details
             _logger.LogDebug("Build default RestSharp client");

@@ -18,7 +18,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
     //todo, low priority do we need a client library wrapper for bosch calls so we don't have to reference hex right in the main code and have it more readable as to what it is doing?
     public class BoschIpCameraClient
     {
-        private static Dictionary<string, string> _sCsrSubject = new Dictionary<string, string>();
         private readonly string _cameraUrl;
         private readonly string _baseUrl;
         private readonly HttpClient _client;
@@ -26,9 +25,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         private HttpResponseMessage _response;
 
 
-        public BoschIpCameraClient(JobConfiguration config, CertificateStore store, IPAMSecretResolver pam,
-            Dictionary<string, string> csrSubject,
-            ILogger logger)
+        public BoschIpCameraClient(JobConfiguration config, CertificateStore store, IPAMSecretResolver pam, ILogger logger)
         {
             _logger = logger;
             _logger.LogTrace("Starting Bosch IP Camera Client config");
@@ -53,8 +50,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             _client = new HttpClient(handler);
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", encodedCredentials);
-
-            _sCsrSubject = csrSubject;
         }
 
         public Dictionary<string, string> ListCerts()
@@ -77,32 +72,32 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             return files;
         }
 
-        //need to think through the parameters sent in here
-        // TODO: parse subject parameters from plain subject field in reenrollment
-        public string CertCreate(string certificateName)
+        // TODO: conditionally add each subject element
+        // TODO: differentiate between cert name and id ?
+        public string CertCreate(Dictionary<string, string> subject, string certificateName)
         {
             try
             {
-                var myCommon = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["CN"]);
-                var myOrg = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["O"]);
-                var myUnit = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["OU"]);
-                var myCountry = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["C"]);
-                var myCity = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["L"]);
-                var myProvince = HexadecimalEncoding.ToHexWithPadding(_sCsrSubject["ST"]);
+                var myCommon = HexadecimalEncoding.ToHexWithPadding(subject["CN"]);
+                var myOrg = HexadecimalEncoding.ToHexWithPadding(subject["O"]);
+                var myUnit = HexadecimalEncoding.ToHexWithPadding(subject["OU"]);
+                var myCountry = HexadecimalEncoding.ToHexWithPadding(subject["C"]);
+                var myCity = HexadecimalEncoding.ToHexWithPadding(subject["L"]);
+                var myProvince = HexadecimalEncoding.ToHexWithPadding(subject["ST"]);
                 var myId = HexadecimalEncoding.ToHexNoPadding(certificateName);
 
                 var payload =
                     $"{HexadecimalEncoding.ToHexWithPrefix(certificateName, 4, '0')}0000{myId}00080001000000010008000200000000";
                 payload +=
-                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["CN"], 4, '0')}0005{myCommon}";
-                payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["O"], 4, '0')}0006{myOrg}";
+                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["CN"], 4, '0')}0005{myCommon}";
+                payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["O"], 4, '0')}0006{myOrg}";
                 payload +=
-                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["OU"], 4, '0')}0007{myUnit}";
-                payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["L"], 4, '0')}0008{myCity}";
+                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["OU"], 4, '0')}0007{myUnit}";
+                payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["L"], 4, '0')}0008{myCity}";
                 payload +=
-                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["C"], 4, '0')}0009{myCountry}";
+                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["C"], 4, '0')}0009{myCountry}";
                 payload +=
-                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(_sCsrSubject["ST"], 4, '0')}000A{myProvince}";
+                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["ST"], 4, '0')}000A{myProvince}";
 
                 GenerateCsrOnCameraAsync(payload,_cameraUrl,_client).Wait();
                 var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);

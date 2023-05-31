@@ -39,8 +39,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         public JobResult removeCert(ManagementJobConfiguration jobConfiguration)
         {
             _logger.LogTrace($"Management Config {JsonConvert.SerializeObject(jobConfiguration)}");
-            JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
-            BoschIpCameraClient client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, null, _logger);
+            BoschIpCameraClient client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 
             //setup the Camera Details
             _logger.LogDebug("Build default RestSharp client");

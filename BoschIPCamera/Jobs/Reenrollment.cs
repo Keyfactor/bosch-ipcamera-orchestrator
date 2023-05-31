@@ -15,23 +15,10 @@ using System.Text;
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
     //todo better error handling and job failure recording (sometimes job fails but says success)
-    //todo move some store custom filed to job entry parameters like CN and others related to the cert
 
     [SuppressMessage("ReSharper", "InconsistentNaming")]
     struct boschIPCameraDetails
     {
-        public string CN;
-        public string SN;
-        public string country;
-        public string state;
-        public string city;
-        public string org;
-        public string OU;
-        public string CA;
-        public string template;
-        public string keyfactorHost;
-        public string keyfactorUser;
-        public string keyfactorPass;
         public string certUsage;
     }
 
@@ -140,12 +127,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
                 _logger.MethodEntry(LogLevel.Debug);
                 _logger.LogTrace($"Reenrollment Config {JsonConvert.SerializeObject(jobConfiguration)}");
-                var storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
-                //setup the CSR details
-                // TODO: include Serial Number from Camera as store property -> CSR info
-                var csrSubject = SetupCsrSubject(storeProperties);
 
-                var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, csrSubject, _logger);
+                var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 
                 //delete existing certificate
                 // TODO: make checkbox to confirm overwrite?
@@ -157,8 +140,11 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
 
+                //setup the CSR details
+                var csrSubject = SetupCsrSubject(jobConfiguration.JobProperties["subjectText"].ToString());
+
                 //generate the CSR on the camera
-                returnCode = client.CertCreate(jobConfiguration.CertificateStoreDetails.StorePath);
+                returnCode = client.CertCreate(csrSubject, jobConfiguration.CertificateStoreDetails.StorePath);
 
                 if (returnCode != "pass")
                 {
@@ -200,6 +186,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 //set cert usage
                 // TODO: use readable names, multiple choice for Cert Usage, decode to correct HEX values based on constants
                 // TODO: change cert usage to entry parameter
+                var storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
                 returnCode = client.SetCertUsage(jobConfiguration.CertificateStoreDetails.StorePath, storeProperties.certUsage);
                 if (returnCode != "pass")
                 {
@@ -228,18 +215,20 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             }
             
         }
-        private Dictionary<string, string> SetupCsrSubject(boschIPCameraDetails storeProperties)
+        private Dictionary<string, string> SetupCsrSubject(string subjectText)
         {
-            var csrSubject = new Dictionary<string, string>
+            var csrSubject = new Dictionary<string, string>();
+            _logger.LogTrace($"Parsing subject text: {subjectText}");
+            var splitSubject = subjectText.Split(',');
+            foreach (string subjectElement in splitSubject)
             {
-                {"C", storeProperties.country},
-                {"ST", storeProperties.state},
-                {"L", storeProperties.city},
-                {"O", storeProperties.org},
-                {"OU", storeProperties.OU},
-                {"CN", storeProperties.CN}
-            };
-
+                _logger.LogTrace($"Splitting subject element: {subjectElement}");
+                var splitSubjectElement = subjectElement.Split('=');
+                var name = splitSubjectElement[0].Trim();
+                var value = splitSubjectElement[1].Trim();
+                _logger.LogTrace($"Adding subject element: '{name}' with value '{value}'");
+                csrSubject.Add(name, value);
+            }
 
             return csrSubject;
         }
