@@ -72,32 +72,55 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             return files;
         }
 
-        // TODO: conditionally add each subject element
-        // TODO: differentiate between cert name and id ?
         public string CertCreate(Dictionary<string, string> subject, string certificateName)
         {
             try
             {
-                var myCommon = HexadecimalEncoding.ToHexWithPadding(subject["CN"]);
-                var myOrg = HexadecimalEncoding.ToHexWithPadding(subject["O"]);
-                var myUnit = HexadecimalEncoding.ToHexWithPadding(subject["OU"]);
-                var myCountry = HexadecimalEncoding.ToHexWithPadding(subject["C"]);
-                var myCity = HexadecimalEncoding.ToHexWithPadding(subject["L"]);
-                var myProvince = HexadecimalEncoding.ToHexWithPadding(subject["ST"]);
                 var myId = HexadecimalEncoding.ToHexNoPadding(certificateName);
+                var payload = $"{HexadecimalEncoding.ToHexWithPrefix(certificateName, 4, '0')}0000{myId}";
 
-                var payload =
-                    $"{HexadecimalEncoding.ToHexWithPrefix(certificateName, 4, '0')}0000{myId}00080001000000010008000200000000";
-                payload +=
-                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["CN"], 4, '0')}0005{myCommon}";
-                payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["O"], 4, '0')}0006{myOrg}";
-                payload +=
-                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["OU"], 4, '0')}0007{myUnit}";
-                payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["L"], 4, '0')}0008{myCity}";
-                payload +=
-                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["C"], 4, '0')}0009{myCountry}";
-                payload +=
-                    $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["ST"], 4, '0')}000A{myProvince}";
+                // RAW HEX: "length" + "tag" + "content"
+                // length is full byte count of header (length + tag) + content
+                var keyType = "0008" + "0001" + "00000001";
+                var requesttype = "0008" + "0002" + "00000000";
+
+                payload += keyType;
+                payload += requesttype;
+
+                // CN is expected
+                // TODO: add logging error if no CN added
+                var myCommon = HexadecimalEncoding.ToHexWithPadding(subject["CN"]);
+                payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["CN"], 4, '0')}0005{myCommon}";
+
+                if (subject.ContainsKey("O"))
+                {
+                    var myOrg = HexadecimalEncoding.ToHexWithPadding(subject["O"]);
+                    payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["O"], 4, '0')}0006{myOrg}";
+                }
+
+                if (subject.ContainsKey("OU"))
+                {
+                    var myUnit = HexadecimalEncoding.ToHexWithPadding(subject["OU"]);
+                    payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["OU"], 4, '0')}0007{myUnit}";
+                }
+
+                if (subject.ContainsKey("L"))
+                {
+                    var myCity = HexadecimalEncoding.ToHexWithPadding(subject["L"]);
+                    payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["L"], 4, '0')}0008{myCity}";
+                }
+
+                if (subject.ContainsKey("C"))
+                {
+                    var myCountry = HexadecimalEncoding.ToHexWithPadding(subject["C"]);
+                    payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["C"], 4, '0')}0009{myCountry}";
+                }
+
+                if (subject.ContainsKey("ST"))
+                {
+                    var myProvince = HexadecimalEncoding.ToHexWithPadding(subject["ST"]);
+                    payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["ST"], 4, '0')}000A{myProvince}";
+                }
 
                 GenerateCsrOnCameraAsync(payload,_cameraUrl,_client).Wait();
                 var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);
