@@ -11,13 +11,13 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
     //todo better error handling and job failure recording (sometimes job fails but says success)
     public class Management : IManagementJobExtension
     {  
-        private readonly ILogger<Management> _logger;
+        private readonly ILogger _logger;
         private readonly IPAMSecretResolver _pam;
         public string ExtensionName => "BoschIPCamera";
 
-        public Management(ILogger<Management> logger, IPAMSecretResolver pam)
+        public Management(IPAMSecretResolver pam)
         {
-            _logger = logger;
+            _logger = LogHandler.GetClassLogger<Management>();
             _pam = pam;
         }
 

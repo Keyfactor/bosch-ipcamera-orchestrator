@@ -13,12 +13,12 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
     //todo better error handling and job failure recording (sometimes job fails but says success)
     public class Inventory : IInventoryJobExtension
     {
-        private readonly ILogger<Inventory> _logger;
+        private readonly ILogger _logger;
         private readonly IPAMSecretResolver _pam;
 
-        public Inventory(ILogger<Inventory> logger, IPAMSecretResolver pam)
+        public Inventory(IPAMSecretResolver pam)
         {
-            _logger = logger;
+            _logger = LogHandler.GetClassLogger<Inventory>();
             _pam = pam;
         }
 
@@ -30,6 +30,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace($"Inventory Config {JsonConvert.SerializeObject(jobConfiguration)}");
             JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
+            _logger.LogTrace("Parsed Properties");
             var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, null, _logger);
 
             //setup the Camera Details

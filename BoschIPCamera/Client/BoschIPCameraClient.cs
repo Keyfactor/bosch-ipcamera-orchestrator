@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.ServiceModel;
@@ -29,6 +30,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             Dictionary<string, string> csrSubject,
             ILogger logger)
         {
+            _logger = logger;
+            _logger.LogTrace("Starting Bosch IP Camera Client config");
+
+            // TODO check Use SSL setting to target HTTPS or HTTP
             _baseUrl = $"https://{store.ClientMachine}";
             _cameraUrl = $"https://{store.ClientMachine}/rcp.xml?";
 
@@ -36,8 +41,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             // This will ignore certificate errors in test mode since we don't have a valid cert for the camera on the public IP
             var handler = new HttpClientHandler
             {
-                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => true
+                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; }
             };
+            ServicePointManager.ServerCertificateValidationCallback = (obj, certificate, chain, errors) => { return true; };
 
             var username = ResolvePamField(pam, config.ServerUsername, "Server Username");
             var password = ResolvePamField(pam, config.ServerPassword, "Server Password");
@@ -49,7 +55,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", encodedCredentials);
 
             _sCsrSubject = csrSubject;
-            _logger = logger;
         }
 
         public Dictionary<string, string> ListCerts()

@@ -14,33 +14,8 @@ using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
-
-    //todo Use KF C# client library for this
-    //todo models should not be needed if KF Client Library is used for API
     //todo better error handling and job failure recording (sometimes job fails but says success)
     //todo move some store custom filed to job entry parameters like CN and others related to the cert
-
-    // Structure of KeyfactorAPI/Enrollment/CSR response
-    struct EnrollResponse
-    {
-        public certificateInformation CertificateInformation;
-        public Dictionary<string, object> Metadata;
-    }
-
-    // Nested structure within KeyfactorAPI/Enrollment/CSR response
-    [SuppressMessage("ReSharper", "InconsistentNaming")]
-    struct certificateInformation
-    {
-        public string SerialNumber;
-        public string IssuerDN;
-        public string Thumbprint;
-        public int KeyfactorID;
-        public int KeyfactorRequestId;
-        public string[] Certificates;
-        public string RequestDisposition;
-        public string DispositionMessage;
-        public string EnrollmentContext;
-    }
 
     [SuppressMessage("ReSharper", "InconsistentNaming")]
     struct boschIPCameraDetails
@@ -63,7 +38,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
     public class Reenrollment : IReenrollmentJobExtension
     {
         public string ExtensionName => "BoschIPCamera";
-        private readonly ILogger<Reenrollment> _logger;
+        private readonly ILogger _logger;
         private readonly IPAMSecretResolver _pam;
 
         private void UploadSync(string host, string username, string password, string fileName, string fileData)
@@ -143,48 +118,19 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             s.Write(bytes, 0, bytes.Length);
         }
 
-        //todo Use KF c# client Library
-        private static T MakeWebRequest<T>(string url, string user, string pass, string bodyStr, string method = "POST", bool skipCertCheck=false)
+        public Reenrollment(IPAMSecretResolver pam)
         {
-            if (skipCertCheck)
-            {
-                ServicePointManager.ServerCertificateValidationCallback = (obj, certificate, chain, errors) => (true);
-            }
-
-            var target = url.StartsWith("http") ? url : $"https://{url}";
-            var req = WebRequest.Create(target);
-            req.Method = method;
-            var auth = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{user}:{pass}"));
-            req.Headers.Add("Authorization", $"Basic {auth}");
-            req.Headers.Add("X-Keyfactor-Requested-With", "APIClient");
-            if (method == "POST")
-            {
-                var body = Encoding.ASCII.GetBytes(bodyStr);
-                req.ContentLength = body.Length;
-                req.ContentType = "application/json";
-                using var s = req.GetRequestStream();
-                s.Write(body, 0, body.Length);
-                s.Close();
-            }
-            var responseStream = req.GetResponse().GetResponseStream();
-            var resp = new StreamReader(responseStream ?? throw new InvalidOperationException()).ReadToEnd();
-            var respObj = JsonConvert.DeserializeObject<T>(resp);
-            return respObj;
-        }
-
-        public Reenrollment(ILogger<Reenrollment> logger, IPAMSecretResolver pam)
-        {
-            _logger = logger;
+            _logger = LogHandler.GetClassLogger<Reenrollment>();
             _pam = pam;
         }
 
         public JobResult ProcessJob(ReenrollmentJobConfiguration jobConfiguration, SubmitReenrollmentCSR submitReenrollmentUpdate)
         {
             _logger.MethodEntry(LogLevel.Debug);
-            return PerformReenrollment(jobConfiguration);
+            return PerformReenrollment(jobConfiguration, submitReenrollmentUpdate);
         }
 
-        private JobResult PerformReenrollment(ReenrollmentJobConfiguration jobConfiguration)
+        private JobResult PerformReenrollment(ReenrollmentJobConfiguration jobConfiguration, SubmitReenrollmentCSR submitReenrollment)
         {
 
             try
@@ -196,6 +142,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 _logger.LogTrace($"Reenrollment Config {JsonConvert.SerializeObject(jobConfiguration)}");
                 var storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
                 //setup the CSR details
+                // TODO: include Serial Number from Camera as store property -> CSR info
                 var csrSubject = SetupCsrSubject(storeProperties);
 
                 var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, csrSubject, _logger);
@@ -220,21 +167,26 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
 
                 //get the CSR from the camera
-                var responseContent = client.DownloadCsrFromCamera(jobConfiguration.CertificateStoreDetails.StorePath);
-                _logger.LogDebug("Downloaded CSR: " + responseContent);
+                var csr = client.DownloadCsrFromCamera(jobConfiguration.CertificateStoreDetails.StorePath);
+                _logger.LogDebug("Downloaded CSR: " + csr);
               
-
-                //todo use Keyfactor C# client library
                 //sign CSR in Keyfactor
-                var body = $"{{\"CSR\": \"{responseContent}\",\"CertificateAuthority\": \"{storeProperties.CA}\",  \"IncludeChain\": false,  \"Metadata\": {{}},  \"Timestamp\": \"{DateTime.UtcNow:s}\",  \"Template\": \"{storeProperties.template}\"}}";
                 // TODO: use Reenrollment arg to submit CSR instead of custom API call
-                var resp = MakeWebRequest<EnrollResponse>(storeProperties.keyfactorHost+"/KeyfactorAPI/Enrollment/CSR", storeProperties.keyfactorUser, jobConfiguration.CertificateStoreDetails.StorePassword, body, skipCertCheck: true);
-                var cert = resp.CertificateInformation.Certificates[0];
-                cert = cert.Substring(cert.IndexOf("-----", StringComparison.Ordinal));
-                _logger.LogDebug(cert);
+                // TODO: error handle when not receiving Cert from Keyfactor
+                var x509Cert = submitReenrollment.Invoke(csr);
+
+                // build PEM content
+                StringBuilder pemBuilder = new StringBuilder();
+                pemBuilder.AppendLine("-----BEGIN CERTIFICATE-----");
+                pemBuilder.AppendLine(Convert.ToBase64String(x509Cert.RawData, Base64FormattingOptions.InsertLineBreaks));
+                pemBuilder.AppendLine("-----END CERTIFICATE-----");
+                var pemCert = pemBuilder.ToString();
+
+                pemCert = pemCert.Replace("\r", "");
+                _logger.LogDebug(pemCert);
 
                 //upload the signed cert to the camera
-                UploadSync(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername, jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath+".cer", cert);
+                UploadSync(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername, jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath+".cer", pemCert);
 
                 //turn on 802.1x - "1" is on
                 // TODO: make 802.1X a setting in store / entry parameters ?
