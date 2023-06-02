@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -22,25 +23,32 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         private readonly string _baseUrl;
         private readonly HttpClient _client;
         private readonly ILogger _logger;
+        private readonly CredentialCache _digestCredential;
         private HttpResponseMessage _response;
-
 
         public BoschIpCameraClient(JobConfiguration config, CertificateStore store, IPAMSecretResolver pam, ILogger logger)
         {
             _logger = logger;
             _logger.LogTrace("Starting Bosch IP Camera Client config");
 
-            // TODO check Use SSL setting to target HTTPS or HTTP
-            _baseUrl = $"https://{store.ClientMachine}";
-            _cameraUrl = $"https://{store.ClientMachine}/rcp.xml?";
+            if (config.UseSSL)
+            {
+                _baseUrl = $"https://{store.ClientMachine}";
+                _cameraUrl = $"https://{store.ClientMachine}/rcp.xml?";
+            }
+            else
+            {
+                _baseUrl = $"http://{store.ClientMachine}";
+                _cameraUrl = $"http://{store.ClientMachine}/rcp.xml?";
+            }
 
             // TODO: validate SSL cert
             // This will ignore certificate errors in test mode since we don't have a valid cert for the camera on the public IP
-            var handler = new HttpClientHandler
-            {
-                ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; }
-            };
-            ServicePointManager.ServerCertificateValidationCallback = (obj, certificate, chain, errors) => { return true; };
+            //var handler = new HttpClientHandler
+            //{
+            //    ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; }
+            //};
+            //ServicePointManager.ServerCertificateValidationCallback = (obj, certificate, chain, errors) => { return true; };
 
             var username = ResolvePamField(pam, config.ServerUsername, "Server Username");
             var password = ResolvePamField(pam, config.ServerPassword, "Server Password");
@@ -48,8 +56,15 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             var credentials = $"{username}:{password}";
             var encodedCredentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(credentials));
 
-            _client = new HttpClient(handler);
+            //_client = new HttpClient(handler);
+            _client = new HttpClient();
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", encodedCredentials);
+
+            // for use in reenrollment cert upload calls
+            _digestCredential = new CredentialCache
+            {
+                {new Uri(_baseUrl), "Digest", new NetworkCredential(username, password)}
+            };
         }
 
         public Dictionary<string, string> ListCerts()
@@ -185,6 +200,79 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 }
 
             return csrResult;
+        }
+
+        public void UploadCert(string fileName, string fileData)
+        {
+            _logger.LogTrace("Starting Cert upload to camera " + _baseUrl);
+
+            var boundary = "----------" + DateTime.Now.Ticks.ToString("x");
+            var fileHeader =
+                $"Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{fileName}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n";
+
+            var authRequest = (HttpWebRequest)WebRequest.Create(_baseUrl + "/upload.htm");
+            authRequest.Method = "GET";
+            authRequest.Credentials = _digestCredential;
+            authRequest.PreAuthenticate = true;
+
+            try
+            {
+                _logger.LogTrace("Get Auth call to camera on " + _baseUrl);
+                authRequest.GetResponse();
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e.Message);
+            }
+
+            var count = 0;
+            //keep trying until we get the cert on camera or try 5 times
+            while (count <= 5)
+            {
+                try
+                {
+                    count++;
+                    _logger.LogTrace("Post call to camera on " + _baseUrl);
+                    var httpWebRequest = (HttpWebRequest)WebRequest.Create(_baseUrl + "/upload.htm");
+                    httpWebRequest.Credentials = _digestCredential;
+                    httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
+                    httpWebRequest.Method = "POST";
+                    //httpWebRequest.PreAuthenticate = true;
+
+                    var requestStream = httpWebRequest.GetRequestStream();
+                    WriteToStream(requestStream, "--" + boundary + "\r\n");
+                    WriteToStream(requestStream, fileHeader);
+                    WriteToStream(requestStream, fileData);
+                    WriteToStream(requestStream, "\r\n--" + boundary + "--\r\n");
+                    //requestStream.Close();
+
+                    var myHttpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
+
+
+                    var responseStream = myHttpWebResponse.GetResponseStream();
+
+                    var myStreamReader = new StreamReader(responseStream ?? throw new InvalidOperationException(), Encoding.Default);
+
+                    myStreamReader.ReadToEnd();
+
+                    myStreamReader.Close();
+                    responseStream.Close();
+
+                    myHttpWebResponse.Close();
+                    return;
+                }
+                catch (Exception e)
+                {
+                    _logger.LogError(e.Message);
+                    _logger.LogTrace("Failed to push cert on attempt " + count + " trying again if less than or equal to 5");
+                }
+            }
+        }
+
+        private static void WriteToStream(Stream s, string txt)
+        {
+            var bytes = Encoding.UTF8.GetBytes(txt);
+            s.Write(bytes, 0, bytes.Length);
         }
 
         private async Task Download(string certName,

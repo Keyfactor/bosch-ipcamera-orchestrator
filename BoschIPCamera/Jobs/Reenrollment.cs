@@ -28,83 +28,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
         private readonly ILogger _logger;
         private readonly IPAMSecretResolver _pam;
 
-        private void UploadSync(string host, string username, string password, string fileName, string fileData)
-        {
-            _logger.LogTrace("Starting Cert upload to camera " + host);
-            
-            var boundary = "----------" + DateTime.Now.Ticks.ToString("x");
-            var fileHeader =
-                $"Content-Disposition: form-data; name=\"certUsageUnspecified\"; filename=\"{fileName}\";\r\nContent-Type: application/x-x509-ca-cert\r\n\r\n";
-            var credCache = new CredentialCache
-            {
-                {new Uri("https://" + host), "Digest", new NetworkCredential(username, password)}
-            };
-
-            var authRequest = (HttpWebRequest)WebRequest.Create("https://" + host + "/upload.htm");
-            authRequest.Method = "GET";
-            authRequest.Credentials = credCache;
-            authRequest.PreAuthenticate = true;
-
-            try
-            {
-                _logger.LogTrace("Get Auth call to camera on " + host);
-                authRequest.GetResponse();
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e.Message);
-            }
-
-            var count = 0;
-            //keep trying until we get the cert on camera or try 5 times
-            while (count <= 5)
-            {
-                try
-                {
-                    count++;
-                    _logger.LogTrace("Post call to camera on " + host);
-                    var httpWebRequest = (HttpWebRequest)WebRequest.Create("https://" + host + "/upload.htm");
-                    httpWebRequest.Credentials = credCache;
-                    httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
-                    httpWebRequest.Method = "POST";
-                    //httpWebRequest.PreAuthenticate = true;
-
-                    var requestStream = httpWebRequest.GetRequestStream();
-                    WriteToStream(requestStream, "--" + boundary + "\r\n");
-                    WriteToStream(requestStream, fileHeader);
-                    WriteToStream(requestStream, fileData);
-                    WriteToStream(requestStream, "\r\n--" + boundary + "--\r\n");
-                    //requestStream.Close();
-
-                    var myHttpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
-
-
-                    var responseStream = myHttpWebResponse.GetResponseStream();
-
-                    var myStreamReader = new StreamReader(responseStream ?? throw new InvalidOperationException(), Encoding.Default);
-
-                    myStreamReader.ReadToEnd();
-
-                    myStreamReader.Close();
-                    responseStream.Close();
-
-                    myHttpWebResponse.Close();
-                    return;
-                }
-                catch (Exception e)
-                {
-                    _logger.LogError(e.Message);
-                    _logger.LogTrace("Failed to push cert on attempt " + count + " trying again if less than or equal to 5");
-                }
-            }
-        }
-
-        private static void WriteToStream(Stream s, string txt)
-        {
-            var bytes = Encoding.UTF8.GetBytes(txt);
-            s.Write(bytes, 0, bytes.Length);
-        }
-
         public Reenrollment(IPAMSecretResolver pam)
         {
             _logger = LogHandler.GetClassLogger<Reenrollment>();
@@ -140,7 +63,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
 
-                //setup the CSR details
+                // setup the CSR details
                 var csrSubject = SetupCsrSubject(jobConfiguration.JobProperties["subjectText"].ToString());
 
                 //generate the CSR on the camera
@@ -156,8 +79,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var csr = client.DownloadCsrFromCamera(jobConfiguration.CertificateStoreDetails.StorePath);
                 _logger.LogDebug("Downloaded CSR: " + csr);
               
-                //sign CSR in Keyfactor
-                // TODO: use Reenrollment arg to submit CSR instead of custom API call
+                // sign CSR in Keyfactor
                 // TODO: error handle when not receiving Cert from Keyfactor
                 var x509Cert = submitReenrollment.Invoke(csr);
 
@@ -172,7 +94,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 _logger.LogDebug(pemCert);
 
                 //upload the signed cert to the camera
-                UploadSync(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername, jobConfiguration.ServerPassword, jobConfiguration.CertificateStoreDetails.StorePath+".cer", pemCert);
+                client.UploadCert(jobConfiguration.CertificateStoreDetails.StorePath+".cer", pemCert);
 
                 //turn on 802.1x - "1" is on
                 // TODO: make 802.1X a setting in store / entry parameters ?
