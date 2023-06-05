@@ -16,12 +16,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
     //todo better error handling and job failure recording (sometimes job fails but says success)
 
-    [SuppressMessage("ReSharper", "InconsistentNaming")]
-    struct boschIPCameraDetails
-    {
-        public string certUsage;
-    }
-
     public class Reenrollment : IReenrollmentJobExtension
     {
         public string ExtensionName => "BoschIPCamera";
@@ -53,13 +47,16 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
                 var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 
+                // TODO: safe check required field is present
+                var certName = jobConfiguration.JobProperties["Name"].ToString();
+
                 //delete existing certificate
                 // TODO: make checkbox to confirm overwrite?
-                var returnCode = client.DeleteCertByName(jobConfiguration.CertificateStoreDetails.StorePath);
+                var returnCode = client.DeleteCertByName(certName);
 
                 if (returnCode != "pass")
                 {
-                     sb.Append("Error deleting existing certificate " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                     sb.Append("Error deleting existing certificate " + certName + " on camera " +
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
 
@@ -67,16 +64,16 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var csrSubject = SetupCsrSubject(jobConfiguration.JobProperties["subjectText"].ToString());
 
                 //generate the CSR on the camera
-                returnCode = client.CertCreate(csrSubject, jobConfiguration.CertificateStoreDetails.StorePath);
+                returnCode = client.CertCreate(csrSubject, certName);
 
                 if (returnCode != "pass")
                 {
-                    sb.Append("Error generating CSR for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                    sb.Append("Error generating CSR for " + certName + " on camera " +
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
 
                 //get the CSR from the camera
-                var csr = client.DownloadCsrFromCamera(jobConfiguration.CertificateStoreDetails.StorePath);
+                var csr = client.DownloadCsrFromCamera(certName);
                 _logger.LogDebug("Downloaded CSR: " + csr);
               
                 // sign CSR in Keyfactor
@@ -94,25 +91,26 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 _logger.LogDebug(pemCert);
 
                 //upload the signed cert to the camera
-                client.UploadCert(jobConfiguration.CertificateStoreDetails.StorePath+".cer", pemCert);
+                client.UploadCert(certName +".cer", pemCert);
 
                 //turn on 802.1x - "1" is on
                 // TODO: make 802.1X a setting in store / entry parameters ?
                 returnCode = client.Change8021XSettings("1");
                 if (returnCode != "pass")
                 {
-                     sb.Append("Error setting 802.1x to on for " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                     sb.Append("Error setting 802.1x to on for " + certName + " on camera " +
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
 
                 //set cert usage
                 // TODO: use readable names, multiple choice for Cert Usage, decode to correct HEX values based on constants
-                // TODO: change cert usage to entry parameter
-                var storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
-                returnCode = client.SetCertUsage(jobConfiguration.CertificateStoreDetails.StorePath, storeProperties.certUsage);
+                // TODO: safe check required field is present (before doing all reenrollment work above)
+                var certUsage = jobConfiguration.JobProperties["CertificateUsage"].ToString();
+
+                returnCode = client.SetCertUsage(certName, certUsage);
                 if (returnCode != "pass")
                 {
-                    sb.Append("Error setting certUsage of " + storeProperties.certUsage + "for store path " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                    sb.Append("Error setting certUsage of " + certUsage + "for store path " + certName + " on camera " +
                         jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 }
 

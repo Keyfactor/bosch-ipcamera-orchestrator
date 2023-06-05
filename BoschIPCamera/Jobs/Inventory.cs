@@ -36,20 +36,30 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             _logger.LogDebug("Build default RestSharp client");
 
             var files = client.ListCerts();
+
+            // get cert usage
+            // need request cert usage lists for each cert usage type, and parse names from response to match types
+            // key = cert name, value = cert usage
+            var certUsages = client.GetCertUsageList();
+
             var inventory = files.Select(f => new CurrentInventoryItem()
             {
                 Alias = f.Key,
                 Certificates = new List<string>() { f.Value },
                 PrivateKeyEntry = false,
-                UseChainLevel = false
+                UseChainLevel = false,
+                Parameters = new Dictionary<string, object>
+                {
+                    { "Name", f.Key },
+                    { "CertificateUsage", certUsages.ContainsKey(f.Key) ? certUsages[f.Key] : "" }
+                }
             }).ToList();
             
-            // In the model where a bosch certstore represents just a single cert, this list needs to be trimmed.
-            // inventory = inventory.Where(i => i.Alias == jobConfiguration.CertificateStoreDetails.StorePath).ToList();
             submitInventoryUpdate(inventory);
             return new JobResult()
             {
                 Result = OrchestratorJobStatusJobResult.Success,
+                JobHistoryId = jobConfiguration.JobHistoryId,
                 FailureMessage = ""
             };
         }

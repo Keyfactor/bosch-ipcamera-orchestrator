@@ -372,6 +372,64 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         }
 
+        // get the cert usage
+        public Dictionary<string, string> GetCertUsageList()
+        {
+            _logger.LogTrace($"Get cert usage list for camera " + _cameraUrl);
+
+            // list of cert usage types
+            var certUsages = new List<string>() { "00000000", "00000001", "80000000" };
+
+            var usages = new Dictionary<string, string>();
+            foreach(string usage in certUsages)
+            {
+                string certWithUsage = GetCertWithUsage(usage);
+                if (string.IsNullOrWhiteSpace(certWithUsage))
+                {
+                    continue; // no cert name found with this particular usage
+                }
+                usages[certWithUsage] = usage;
+            }
+
+            return usages;
+        }
+
+        // get certs with usage
+        private string GetCertWithUsage(string usage)
+        {
+            var source = new CancellationTokenSource();
+            var token = source.Token;
+
+            // payload = length + tag (0) + cert usage starting with 0 bit for end cert
+            var payload = "0x" + "0008" + "0000" + usage;
+
+            var requestUri =
+                $"{_cameraUrl}command=0x0BF2&type=P_OCTET&direction=READ&num=1&payload={Uri.EscapeDataString(payload)}";
+
+            var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+
+            _response = _client.SendAsync(request, token).Result;
+            if (!_response.IsSuccessStatusCode)
+                throw new Exception($"Request failed with status code {_response.StatusCode}");
+
+            // TODO: remove tracing
+            var responseText = _response.Content.ReadAsStringAsync().Result;
+            _logger.LogTrace($"Trace of response for cert usage {usage} : \n\n {responseText} \n");
+
+            var taggedResponses = ParseStringListResponse(responseText);
+            _logger.LogTrace($"Parse response count: {taggedResponses.Count}");
+
+            if (taggedResponses.Count == 2)
+            {
+                // 2 responses - first tag 0000 is usage, tag 0001 is the cert name
+                // cert name is tagged with '0001' in response
+                return taggedResponses["0001"];
+            }
+            else
+            {
+                return "";
+            }
+        }
 
         //set the cert usage on a cert
         public string SetCertUsage(string certName, string usageCode)
@@ -427,7 +485,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             _logger.LogTrace("Delete cert " + certName + " for camera " + _cameraUrl);
             var myId = HexadecimalEncoding.ToHexNoPadding(certName);
             var payload = HexadecimalEncoding.ToHexWithPrefix(certName, 4, '0') + "0000" + myId +
-                          "0004000200080003000000FF";
+                          "00040002" + "00080003000000FF";
 
             try
             {
@@ -491,6 +549,52 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             for (var i = 0; i < s.Length; i += Convert.ToInt32(s.Substring(i, 4), 16) * 2)
                 certNames.Add(HexadecimalEncoding.FromHex(getName(s, i + 16)));
             return certNames;
+        }
+
+        public Dictionary<string, string> ParseStringListResponse(string response)
+        {
+            var xmlResponse = new XmlDocument();
+            xmlResponse.LoadXml(response);
+
+            // Parse raw hex content from the response
+            var rawHex =
+                xmlResponse.GetElementsByTagName("str")[0].InnerText
+                    .Replace(" ", "")
+                    .Replace("\r", "")
+                    .Replace("\n", "");
+
+            var taggedResponses = new Dictionary<string, string>();
+
+            var indexStart = 0;
+            while (indexStart < rawHex.Length)
+            {
+                // NOTE: 1 byte is equivalent to 2 hex chars. so the "length" or numOfBytes *2 is actual char count for a full entry
+                // first 4 chars are length of a response entry
+                // todo: remove extra logging
+                var hexLength = rawHex.Substring(indexStart, 4);
+                _logger.LogTrace($"Raw hex length: {hexLength}");
+                var numOfBytes = Convert.ToInt32(hexLength, 16);
+                _logger.LogTrace($"Parsed length hex '{rawHex.Substring(indexStart, 4)}' to length '{numOfBytes}'");
+                // next 4 chars are hex code of tag
+                var tag = rawHex.Substring(indexStart + 4, 4);
+                _logger.LogTrace($"Parsing for tag '{tag}'");
+                // length minus 4 bytes (for length and tag entries) is remaining count of bytes (2 chars each) to evaluate for actual value
+                var remainingBytes = numOfBytes - 4;
+
+                var value = "";
+                if (remainingBytes > 0)
+                {
+                    // value starts at index start + 8, and char length is remaining bytes * 2
+                    var hexValue = rawHex.Substring(indexStart + 8, remainingBytes * 2);
+                    value = HexadecimalEncoding.FromHex(hexValue);
+                    _logger.LogTrace($"Found hex '{hexValue}' parsed to '{value}'");
+                }
+
+                taggedResponses[tag] = value;
+                indexStart += numOfBytes * 2;
+            }
+
+            return taggedResponses;
         }
 
         private string ResolvePamField(IPAMSecretResolver pam, string key, string fieldName)

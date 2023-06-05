@@ -32,6 +32,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             return new JobResult()
             {
                 Result = Orchestrators.Common.Enums.OrchestratorJobStatusJobResult.Failure,
+                JobHistoryId = jobConfiguration.JobHistoryId,
                 FailureMessage = $"Unsupported operation type {jobConfiguration.OperationType}"
             };
         }
@@ -41,27 +42,29 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             _logger.LogTrace($"Management Config {JsonConvert.SerializeObject(jobConfiguration)}");
             BoschIpCameraClient client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 
-            //setup the Camera Details
-            _logger.LogDebug("Build default RestSharp client");
+            // TODO: safe check required field is present
+            var certName = jobConfiguration.JobProperties["Name"].ToString();
 
             //delete existing certificate
-            _logger.LogDebug("Delete existing cert " + jobConfiguration.CertificateStoreDetails.StorePath);
-            string returnCode = client.DeleteCertByName(jobConfiguration.CertificateStoreDetails.StorePath);
+            _logger.LogDebug("Delete existing cert " + certName);
+            string returnCode = client.DeleteCertByName(certName);
 
             if (returnCode == "fail")
             {
-                _logger.LogError("Error deleting existing certificate " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                _logger.LogError("Error deleting existing certificate " + certName + " on camera " +
                     jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
                 return new JobResult()
                 {
                     Result = Orchestrators.Common.Enums.OrchestratorJobStatusJobResult.Failure,
-                    FailureMessage = "Error deleting existing certificate " + jobConfiguration.CertificateStoreDetails.StorePath + " on camera " +
+                    JobHistoryId = jobConfiguration.JobHistoryId,
+                    FailureMessage = "Error deleting existing certificate " + certName + " on camera " +
                     jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode
                 };
             }
             return new JobResult()
             {
-            Result = Orchestrators.Common.Enums.OrchestratorJobStatusJobResult.Success,
+                Result = Orchestrators.Common.Enums.OrchestratorJobStatusJobResult.Success,
+                JobHistoryId = jobConfiguration.JobHistoryId,
                 FailureMessage = ""
             };
         }
