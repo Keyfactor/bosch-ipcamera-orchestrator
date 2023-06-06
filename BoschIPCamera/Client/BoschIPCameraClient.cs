@@ -69,10 +69,14 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         public Dictionary<string, string> ListCerts()
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, _cameraUrl)
-            {
-                RequestUri = new Uri(_cameraUrl + "command=0x0BEB&type=P_OCTET&direction=READ&num=1")
-            };
+            var api = Constants.API.BuildRequestUri(
+                Constants.API.Endpoints.CERTIFICATE_LIST,
+                Constants.API.Type.P_OCTET,
+                Constants.API.Direction.READ
+            );
+            var requestUri = $"{_cameraUrl}{api}";
+
+            var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
             var task = _client.SendAsync(request);
             task.Wait();
@@ -137,7 +141,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                     payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["ST"], 4, '0')}000A{myProvince}";
                 }
 
-                GenerateCsrOnCameraAsync(payload,_cameraUrl,_client).Wait();
+                GenerateCsrOnCameraAsync(payload).Wait();
                 var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);
                 if (returnCode != null)
                 {
@@ -157,23 +161,19 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
 
         //Call the camera to generate a CSR
-        private static async Task GenerateCsrOnCameraAsync(string payload,string cameraUrl,HttpClient client)
+        private async Task GenerateCsrOnCameraAsync(string payload)
         {
-            var queryParams = new Dictionary<string, string>
-            {
-                {"command", "0x0BEC"},
-                {"type", "P_OCTET"},
-                {"direction", "WRITE"},
-                {"num", "1"},
-                {"payload", payload}
-            };
-
-            var queryString = new FormUrlEncodedContent(queryParams).ReadAsStringAsync();
-            var requestUri = cameraUrl + await queryString;
+            var api = Constants.API.BuildRequestUri(
+                Constants.API.Endpoints.CERTIFICATE_REQUEST,
+                Constants.API.Type.P_OCTET,
+                Constants.API.Direction.WRITE,
+                Uri.EscapeDataString(payload)
+            );
+            var requestUri = $"{_cameraUrl}{api}";
 
             var cancellationTokenSource = new CancellationTokenSource();
             var token = cancellationTokenSource.Token;
-            var _ = await client.GetAsync(requestUri, token);
+            var _ = await _client.GetAsync(requestUri, token);
         }
 
         public string DownloadCsrFromCamera(string certName)
@@ -317,13 +317,19 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         //Enable/Disable 802.1x on the camera after the certs are in place
         //onOffSwitch - "0" means off, "1" means on
+        // TODO: make bool
         private async Task Change8021X(string onOffSwitch)
         {
             var source = new CancellationTokenSource();
             var token = source.Token;
 
-            var requestUri =
-                $"{_cameraUrl}command=0x09EB&type=T_OCTET&direction=WRITE&num=1&payload={Uri.EscapeDataString(onOffSwitch)}";
+            var api = Constants.API.BuildRequestUri(
+                Constants.API.Endpoints.EAP_ENABLE,
+                Constants.API.Type.T_OCTET,
+                Constants.API.Direction.WRITE,
+                Uri.EscapeDataString(onOffSwitch)
+            );
+            var requestUri = $"{_cameraUrl}{api}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
@@ -362,7 +368,13 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             var source = new CancellationTokenSource();
             var token = source.Token;
 
-            var requestUri = $"{_cameraUrl}command=0x0811&type=F_FLAG&direction=WRITE&num=1&payload=1";
+            var api = Constants.API.BuildRequestUri(
+                Constants.API.Endpoints.BOARD_RESET,
+                Constants.API.Type.F_FLAG,
+                Constants.API.Direction.WRITE,
+                "1" // sending 1 reboots camera
+            );
+            var requestUri = $"{_cameraUrl}{api}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
@@ -378,7 +390,11 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             _logger.LogTrace($"Get cert usage list for camera " + _cameraUrl);
 
             // list of cert usage types
-            var certUsages = new List<string>() { "00000000", "00000001", "80000000" };
+            var certUsages = new List<string>() { 
+                Constants.CertificateUsage.HTTPS.ToUsageCode(),
+                Constants.CertificateUsage.EAP_TLS_Client.ToUsageCode(),
+                Constants.CertificateUsage.TLS_DATE_Client.ToUsageCode()
+            };
 
             var usages = new Dictionary<string, string>();
             foreach(string usage in certUsages)
@@ -395,6 +411,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         }
 
         // get certs with usage
+        // TODO: use Enum
         private string GetCertWithUsage(string usage)
         {
             var source = new CancellationTokenSource();
@@ -403,8 +420,13 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             // payload = length + tag (0) + cert usage starting with 0 bit for end cert
             var payload = "0x" + "0008" + "0000" + usage;
 
-            var requestUri =
-                $"{_cameraUrl}command=0x0BF2&type=P_OCTET&direction=READ&num=1&payload={Uri.EscapeDataString(payload)}";
+            var api = Constants.API.BuildRequestUri(
+                Constants.API.Endpoints.CERTIFICATE_USAGE,
+                Constants.API.Type.P_OCTET,
+                Constants.API.Direction.READ,
+                Uri.EscapeDataString(payload)
+            );
+            var requestUri = $"{_cameraUrl}{api}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
@@ -432,11 +454,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         }
 
         //set the cert usage on a cert
-        public string SetCertUsage(string certName, string usageCode)
+        public string SetCertUsage(string certName, Constants.CertificateUsage usageCode)
         {
-            _logger.LogTrace("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " +
-                             _cameraUrl);
-            var payload = "0x00080000" + usageCode;
+            _logger.LogTrace($"Setting cert usage to {usageCode.ToReadableText()} for cert {certName} for camera {_cameraUrl}");
+            var payload = "0x00080000" + usageCode.ToUsageCode();
             var myId = HexadecimalEncoding.ToHexNoPadding(certName);
             var additionalPayload = payload + HexadecimalEncoding.ToHex(certName, 4, '0') + "0001" + myId;
 
@@ -446,18 +467,16 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 var returnCode = parseCameraResponse(_response.Content.ReadAsStringAsync().Result);
                 if (returnCode != null)
                 {
-                    _logger.LogError("Setting cert usage to " + usageCode + " for cert " + certName + " for camera " +
-                                     _cameraUrl + " failed with error code " + returnCode);
+                    _logger.LogError($"Setting cert usage to {usageCode.ToReadableText()} for cert {certName} for camera {_cameraUrl} failed with error code {returnCode}");
                     return returnCode;
                 }
 
-                _logger.LogInformation("Successfully changed cert usage to " + usageCode + " for cert " + certName +
-                                       " for camera " + _cameraUrl);
+                _logger.LogInformation($"Successfully changed cert usage to {usageCode.ToReadableText()} for cert {certName} for camera {_cameraUrl}");
                 return "pass";
             }
             catch (Exception ex)
             {
-                _logger.LogError("Cert usage change failed with the following error: " + ex);
+                _logger.LogError($"Cert usage change failed with the following error: {ex}");
                 return ex.ToString();
             }
         }
@@ -468,8 +487,13 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             var source = new CancellationTokenSource();
             var token = source.Token;
 
-            var requestUri =
-                $"{_cameraUrl}command=0x0BF2&type=P_OCTET&direction=WRITE&num=1&payload={Uri.EscapeDataString(payload)}";
+            var api = Constants.API.BuildRequestUri(
+                Constants.API.Endpoints.CERTIFICATE_USAGE,
+                Constants.API.Type.P_OCTET,
+                Constants.API.Direction.WRITE,
+                Uri.EscapeDataString(payload)
+            );
+            var requestUri = $"{_cameraUrl}{api}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
@@ -512,7 +536,14 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         //delete a cert on camera
         private async Task DeleteCert(string payload)
         {
-            var requestUri = $"{_cameraUrl}command=0x0BE9&type=P_OCTET&direction=WRITE&num=1&payload={payload}";
+            var api = Constants.API.BuildRequestUri(
+                Constants.API.Endpoints.CERTIFICATE,
+                Constants.API.Type.P_OCTET,
+                Constants.API.Direction.WRITE,
+                Uri.EscapeDataString(payload)
+            );
+            var requestUri = $"{_cameraUrl}{api}";
+
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
             _response = await _client.SendAsync(request);
         }

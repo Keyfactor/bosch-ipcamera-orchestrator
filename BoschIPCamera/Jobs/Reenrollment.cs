@@ -103,11 +103,12 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
 
                 //set cert usage
-                // TODO: use readable names, multiple choice for Cert Usage, decode to correct HEX values based on constants
                 // TODO: safe check required field is present (before doing all reenrollment work above)
                 var certUsage = jobConfiguration.JobProperties["CertificateUsage"].ToString();
 
-                returnCode = client.SetCertUsage(certName, certUsage);
+                Constants.CertificateUsage usageEnum = Constants.ParseCertificateUsage(certUsage);
+
+                returnCode = client.SetCertUsage(certName, usageEnum);
                 if (returnCode != "pass")
                 {
                     sb.Append("Error setting certUsage of " + certUsage + "for store path " + certName + " on camera " +

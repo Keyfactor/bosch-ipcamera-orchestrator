@@ -40,6 +40,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             // get cert usage
             // need request cert usage lists for each cert usage type, and parse names from response to match types
             // key = cert name, value = cert usage
+            // TODO: returned cert usage should be Enum
             var certUsages = client.GetCertUsageList();
 
             var inventory = files.Select(f => new CurrentInventoryItem()
@@ -51,7 +52,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 Parameters = new Dictionary<string, object>
                 {
                     { "Name", f.Key },
-                    { "CertificateUsage", certUsages.ContainsKey(f.Key) ? certUsages[f.Key] : "" }
+                    { "CertificateUsage", certUsages.ContainsKey(f.Key) ? ReadCertificateUsage(certUsages[f.Key]) : "" }
                 }
             }).ToList();
             
@@ -62,6 +63,12 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 JobHistoryId = jobConfiguration.JobHistoryId,
                 FailureMessage = ""
             };
+        }
+
+        private string ReadCertificateUsage(string usageCode)
+        {
+            Constants.CertificateUsage usageEnum = Constants.ParseCertificateUsage(usageCode);
+            return usageEnum.ToReadableText();
         }
     }
 }
