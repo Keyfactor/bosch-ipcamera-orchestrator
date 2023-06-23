@@ -43,6 +43,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 sb.Append("");
 
                 _logger.MethodEntry(LogLevel.Debug);
+                // TODO: CANNOT log entire config
                 _logger.LogTrace($"Reenrollment Config {JsonConvert.SerializeObject(jobConfiguration)}");
 
                 var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
@@ -50,14 +51,19 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 // TODO: safe check required field is present
                 var certName = jobConfiguration.JobProperties["Name"].ToString();
 
-                //delete existing certificate
-                // TODO: make checkbox to confirm overwrite?
-                var returnCode = client.DeleteCertByName(certName);
+                string returnCode;
 
-                if (returnCode != "pass")
+                // delete existing certificate if overwriting
+                var overwrite = (bool) jobConfiguration.JobProperties["Overwrite"];
+                if (overwrite)
                 {
-                     sb.Append("Error deleting existing certificate " + certName + " on camera " +
-                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                    returnCode = client.DeleteCertByName(certName);
+
+                    if (returnCode != "pass")
+                    {
+                        sb.Append("Error deleting existing certificate " + certName + " on camera " +
+                           jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                    }
                 }
 
                 // setup the CSR details
@@ -75,7 +81,11 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 //get the CSR from the camera
                 var csr = client.DownloadCsrFromCamera(certName);
                 _logger.LogDebug("Downloaded CSR: " + csr);
-              
+
+                // check for error on download, or that csr does not meet csr format
+                // 404 response can be returned as a successful response?
+                // csr = <body><h1>HTTP/1.0 404 Object not available on this Webserver</h1></body>
+
                 // sign CSR in Keyfactor
                 // TODO: error handle when not receiving Cert from Keyfactor
                 var x509Cert = submitReenrollment.Invoke(csr);
@@ -90,11 +100,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 pemCert = pemCert.Replace("\r", "");
                 _logger.LogDebug(pemCert);
 
-                //upload the signed cert to the camera
+                // upload the signed cert to the camera
                 client.UploadCert(certName +".cer", pemCert);
 
-                //turn on 802.1x - "1" is on
-                // TODO: make 802.1X a setting in store / entry parameters ?
+                // turn on 802.1x - "1" is on
                 returnCode = client.Change8021XSettings("1");
                 if (returnCode != "pass")
                 {

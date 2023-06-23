@@ -173,7 +173,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var cancellationTokenSource = new CancellationTokenSource();
             var token = cancellationTokenSource.Token;
-            var _ = await _client.GetAsync(requestUri, token);
+            _response = await _client.GetAsync(requestUri, token);
         }
 
         public string DownloadCsrFromCamera(string certName)
