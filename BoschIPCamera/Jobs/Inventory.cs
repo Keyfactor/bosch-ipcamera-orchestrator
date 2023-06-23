@@ -10,7 +10,6 @@ using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
-    //todo better error handling and job failure recording (sometimes job fails but says success)
     public class Inventory : IInventoryJobExtension
     {
         private readonly ILogger _logger;
@@ -28,20 +27,17 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             SubmitInventoryUpdate submitInventoryUpdate)
         {
             _logger.MethodEntry(LogLevel.Debug);
-            _logger.LogTrace($"Inventory Config {JsonConvert.SerializeObject(jobConfiguration)}");
-            _logger.LogTrace("Parsed Properties");
             var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 
-            //setup the Camera Details
-            _logger.LogDebug("Build default RestSharp client");
 
             var files = client.ListCerts();
+            _logger.LogDebug($"Found {files.Count} certificates");
 
             // get cert usage
             // need request cert usage lists for each cert usage type, and parse names from response to match types
-            // key = cert name, value = cert usage
-            // TODO: returned cert usage should be Enum
+            // key = cert name, value = cert usage enum
             var certUsages = client.GetCertUsageList();
+            _logger.LogDebug($"Found {certUsages.Count} certificates with a matching usage");
 
             var inventory = files.Select(f => new CurrentInventoryItem()
             {
@@ -52,7 +48,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 Parameters = new Dictionary<string, object>
                 {
                     { "Name", f.Key },
-                    { "CertificateUsage", certUsages.ContainsKey(f.Key) ? ReadCertificateUsage(certUsages[f.Key]) : "" }
+                    { "CertificateUsage", certUsages.ContainsKey(f.Key) ? certUsages[f.Key].ToReadableText() : "" }
                 }
             }).ToList();
             
@@ -63,12 +59,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 JobHistoryId = jobConfiguration.JobHistoryId,
                 FailureMessage = ""
             };
-        }
-
-        private string ReadCertificateUsage(string usageCode)
-        {
-            Constants.CertificateUsage usageEnum = Constants.ParseCertificateUsage(usageCode);
-            return usageEnum.ToReadableText();
         }
     }
 }

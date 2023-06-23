@@ -135,8 +135,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 // upload the signed cert to the camera
                 client.UploadCert(certName +".cer", pemCert);
 
-                // turn on 802.1x - "1" is on
-                returnCode = client.Change8021XSettings("1");
+                // turn on 802.1x
+                returnCode = client.Change8021XSettings(true);
                 if (returnCode != "pass")
                 {
                      errorMessage = $"Error setting 802.1x to on for {certName} on camera {cameraUrl} with error code {returnCode}";

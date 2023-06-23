@@ -43,6 +43,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 _cameraUrl = $"http://{store.ClientMachine}/rcp.xml?";
             }
 
+            _logger.LogDebug($"Base URL: {_baseUrl}");
+            _logger.LogDebug($"Camera API URL: {_cameraUrl}");
+
             var username = ResolvePamField(pam, config.ServerUsername, "Server Username");
             var password = ResolvePamField(pam, config.ServerPassword, "Server Password");
 
@@ -71,6 +74,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
+            _logger.LogTrace($"Sending API request: {requestUri}");
             var task = _client.SendAsync(request);
             task.Wait();
             var cameras = GetCameraCertList(task.Result.Content.ReadAsStringAsync().Result);
@@ -167,6 +171,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var cancellationTokenSource = new CancellationTokenSource();
             var token = cancellationTokenSource.Token;
+
+            _logger.LogTrace($"Sending API request: {requestUri}");
             _response = await _client.GetAsync(requestUri, token);
         }
 
@@ -233,14 +239,12 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                     httpWebRequest.Credentials = _digestCredential;
                     httpWebRequest.ContentType = "multipart/form-data; boundary=" + boundary;
                     httpWebRequest.Method = "POST";
-                    //httpWebRequest.PreAuthenticate = true;
 
                     var requestStream = httpWebRequest.GetRequestStream();
                     WriteToStream(requestStream, "--" + boundary + "\r\n");
                     WriteToStream(requestStream, fileHeader);
                     WriteToStream(requestStream, fileData);
                     WriteToStream(requestStream, "\r\n--" + boundary + "--\r\n");
-                    //requestStream.Close();
 
                     var myHttpWebResponse = (HttpWebResponse)httpWebRequest.GetResponse();
 
@@ -284,11 +288,11 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         }
 
 
-        //Enable/Disable 802.1x setting on the camera
-        public string Change8021XSettings(string onOffSwitch)
+        // Enable/Disable 802.1x setting on the camera
+        public string Change8021XSettings(bool onOffSwitch)
         {
             _logger.MethodEntry(LogLevel.Debug);
-            _logger.LogTrace("Changing Camera 802.1x setting to " + onOffSwitch + " on Camera: " + _cameraUrl);
+            _logger.LogTrace($"Changing Camera 802.1x setting to {(onOffSwitch ? "1" : "0")} on Camera: {_cameraUrl}");
 
             try
             {
@@ -310,10 +314,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             }
         }
 
-        //Enable/Disable 802.1x on the camera after the certs are in place
-        //onOffSwitch - "0" means off, "1" means on
-        // TODO: make bool
-        private async Task Change8021X(string onOffSwitch)
+        // Enable/Disable 802.1x on the camera after the certs are in place
+        // onOffSwitch - "0" means off, "1" means on
+        private async Task Change8021X(bool onOffSwitch)
         {
             var source = new CancellationTokenSource();
             var token = source.Token;
@@ -322,12 +325,13 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 Constants.API.Endpoints.EAP_ENABLE,
                 Constants.API.Type.T_OCTET,
                 Constants.API.Direction.WRITE,
-                Uri.EscapeDataString(onOffSwitch)
+                Uri.EscapeDataString(onOffSwitch ? "1" : "0")
             );
             var requestUri = $"{_cameraUrl}{api}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
+            _logger.LogTrace($"Sending API request: {requestUri}");
             _response = await _client.SendAsync(request, token);
             if (!_response.IsSuccessStatusCode)
                 throw new Exception($"Request failed with status code {_response.StatusCode}");
@@ -374,6 +378,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
+            _logger.LogTrace($"Sending API request: {requestUri}");
             _response = await _client.SendAsync(request, token);
              if(!_response.IsSuccessStatusCode)
                     throw new Exception($"Request failed with status code {_response.StatusCode}");
@@ -381,20 +386,20 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         }
 
         // get the cert usage
-        public Dictionary<string, string> GetCertUsageList()
+        public Dictionary<string, Constants.CertificateUsage> GetCertUsageList()
         {
             _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace($"Get cert usage list for camera " + _cameraUrl);
 
             // list of cert usage types
-            var certUsages = new List<string>() { 
-                Constants.CertificateUsage.HTTPS.ToUsageCode(),
-                Constants.CertificateUsage.EAP_TLS_Client.ToUsageCode(),
-                Constants.CertificateUsage.TLS_DATE_Client.ToUsageCode()
+            var certUsages = new List<Constants.CertificateUsage>() { 
+                Constants.CertificateUsage.HTTPS,
+                Constants.CertificateUsage.EAP_TLS_Client,
+                Constants.CertificateUsage.TLS_DATE_Client
             };
 
-            var usages = new Dictionary<string, string>();
-            foreach(string usage in certUsages)
+            var usages = new Dictionary<string, Constants.CertificateUsage>();
+            foreach(var usage in certUsages)
             {
                 string certWithUsage = GetCertWithUsage(usage);
                 if (string.IsNullOrWhiteSpace(certWithUsage))
@@ -408,14 +413,13 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         }
 
         // get certs with usage
-        // TODO: use Enum
-        private string GetCertWithUsage(string usage)
+        private string GetCertWithUsage(Constants.CertificateUsage usage)
         {
             var source = new CancellationTokenSource();
             var token = source.Token;
 
             // payload = length + tag (0) + cert usage starting with 0 bit for end cert
-            var payload = "0x" + "0008" + "0000" + usage;
+            var payload = "0x" + "0008" + "0000" + usage.ToUsageCode();
 
             var api = Constants.API.BuildRequestUri(
                 Constants.API.Endpoints.CERTIFICATE_USAGE,
@@ -427,13 +431,14 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
+            _logger.LogTrace($"Sending API request: {requestUri}");
             _response = _client.SendAsync(request, token).Result;
             if (!_response.IsSuccessStatusCode)
                 throw new Exception($"Request failed with status code {_response.StatusCode}");
 
             // TODO: remove tracing
             var responseText = _response.Content.ReadAsStringAsync().Result;
-            _logger.LogTrace($"Trace of response for cert usage {usage} : \n\n {responseText} \n");
+            _logger.LogTrace($"Trace of response for cert usage {usage.ToReadableText()} : \n\n {responseText} \n");
 
             var taggedResponses = ParseStringListResponse(responseText);
             _logger.LogTrace($"Parse response count: {taggedResponses.Count}");
@@ -495,6 +500,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
 
+            _logger.LogTrace($"Sending API request: {requestUri}");
             _response = await _client.SendAsync(request, token);
             if (!_response.IsSuccessStatusCode)
                 throw new Exception($"Request failed with status code {_response.StatusCode}");
@@ -544,6 +550,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             var requestUri = $"{_cameraUrl}{api}";
 
             var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
+
+            _logger.LogTrace($"Sending API request: {requestUri}");
             _response = await _client.SendAsync(request);
         }
 
@@ -551,6 +559,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         //returns error code if camera call fails, blank if successful
         private string parseCameraResponse(string response)
         {
+            _logger.LogTrace($"Reading camera response for potential error: {response}");
             string errorCode = null;
             var xmlResponse = new XmlDocument();
             xmlResponse.LoadXml(response);
@@ -602,14 +611,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             {
                 // NOTE: 1 byte is equivalent to 2 hex chars. so the "length" or numOfBytes *2 is actual char count for a full entry
                 // first 4 chars are length of a response entry
-                // todo: remove extra logging
                 var hexLength = rawHex.Substring(indexStart, 4);
-                _logger.LogTrace($"Raw hex length: {hexLength}");
                 var numOfBytes = Convert.ToInt32(hexLength, 16);
-                _logger.LogTrace($"Parsed length hex '{rawHex.Substring(indexStart, 4)}' to length '{numOfBytes}'");
                 // next 4 chars are hex code of tag
                 var tag = rawHex.Substring(indexStart + 4, 4);
-                _logger.LogTrace($"Parsing for tag '{tag}'");
                 // length minus 4 bytes (for length and tag entries) is remaining count of bytes (2 chars each) to evaluate for actual value
                 var remainingBytes = numOfBytes - 4;
 
@@ -619,7 +624,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                     // value starts at index start + 8, and char length is remaining bytes * 2
                     var hexValue = rawHex.Substring(indexStart + 8, remainingBytes * 2);
                     value = HexadecimalEncoding.FromHex(hexValue);
-                    _logger.LogTrace($"Found hex '{hexValue}' parsed to '{value}'");
                 }
 
                 taggedResponses[tag] = value;
