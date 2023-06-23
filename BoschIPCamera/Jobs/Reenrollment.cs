@@ -14,8 +14,6 @@ using System.Text;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
-    //todo better error handling and job failure recording (sometimes job fails but says success)
-
     public class Reenrollment : IReenrollmentJobExtension
     {
         public string ExtensionName => "BoschIPCamera";
@@ -39,9 +37,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
             try
             {
-                var sb = new StringBuilder();
-                sb.Append("");
-
                 _logger.MethodEntry(LogLevel.Debug);
                 // TODO: CANNOT log entire config
                 _logger.LogTrace($"Reenrollment Config {JsonConvert.SerializeObject(jobConfiguration)}");
@@ -52,6 +47,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var certName = jobConfiguration.JobProperties["Name"].ToString();
 
                 string returnCode;
+                string errorMessage;
+                string cameraUrl = jobConfiguration.CertificateStoreDetails.ClientMachine;
 
                 // delete existing certificate if overwriting
                 var overwrite = (bool) jobConfiguration.JobProperties["Overwrite"];
@@ -61,8 +58,14 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
                     if (returnCode != "pass")
                     {
-                        sb.Append("Error deleting existing certificate " + certName + " on camera " +
-                           jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                        errorMessage = $"Error deleting existing certificate {certName} on camera {cameraUrl} with error code {returnCode}";
+                        _logger.LogError(errorMessage);
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = jobConfiguration.JobHistoryId,
+                            FailureMessage = errorMessage
+                        };
                     }
                 }
 
@@ -74,21 +77,50 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
                 if (returnCode != "pass")
                 {
-                    sb.Append("Error generating CSR for " + certName + " on camera " +
-                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                    errorMessage = $"Error generating CSR for {certName} on camera {cameraUrl} with error code {returnCode}";
+                    _logger.LogError(errorMessage);
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = errorMessage
+                    };
                 }
 
                 //get the CSR from the camera
                 var csr = client.DownloadCsrFromCamera(certName);
-                _logger.LogDebug("Downloaded CSR: " + csr);
+                _logger.LogTrace("Downloaded CSR: " + csr);
 
-                // check for error on download, or that csr does not meet csr format
-                // 404 response can be returned as a successful response?
-                // csr = <body><h1>HTTP/1.0 404 Object not available on this Webserver</h1></body>
+                // check that csr meets csr format
+                // 404 message response can be returned instead
+                if (!csr.StartsWith("-----BEGIN"))
+                {
+                    // error downloaded, no CSR present
+                    // likely due to existing cert that was not marked to ovewrite (delete)
+                    errorMessage = $"Error retrieving CSR from camera {cameraUrl} - got response: {csr}";
+                    _logger.LogError(errorMessage);
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = errorMessage
+                    };
+                }
 
                 // sign CSR in Keyfactor
-                // TODO: error handle when not receiving Cert from Keyfactor
                 var x509Cert = submitReenrollment.Invoke(csr);
+
+                if (x509Cert == null)
+                {
+                    errorMessage = $"Error submitting CSR to Keyfactor. Certificate not received. CSR submitted: {csr}";
+                    _logger.LogError(errorMessage);
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = errorMessage
+                    };
+                }
 
                 // build PEM content
                 StringBuilder pemBuilder = new StringBuilder();
@@ -98,7 +130,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var pemCert = pemBuilder.ToString();
 
                 pemCert = pemCert.Replace("\r", "");
-                _logger.LogDebug(pemCert);
+                _logger.LogTrace("Uploading cert: " + pemCert);
 
                 // upload the signed cert to the camera
                 client.UploadCert(certName +".cer", pemCert);
@@ -107,8 +139,14 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 returnCode = client.Change8021XSettings("1");
                 if (returnCode != "pass")
                 {
-                     sb.Append("Error setting 802.1x to on for " + certName + " on camera " +
-                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                     errorMessage = $"Error setting 802.1x to on for {certName} on camera {cameraUrl} with error code {returnCode}";
+                    _logger.LogError(errorMessage);
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = errorMessage
+                    };
                 }
 
                 //set cert usage
@@ -120,28 +158,46 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 returnCode = client.SetCertUsage(certName, usageEnum);
                 if (returnCode != "pass")
                 {
-                    sb.Append("Error setting certUsage of " + certUsage + "for store path " + certName + " on camera " +
-                        jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                    errorMessage = $"Error setting certUsage of {certUsage} for certificate {certName} on camera {cameraUrl} with error code {returnCode}";
+                    _logger.LogError(errorMessage);
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = errorMessage
+                    };
                 }
 
                 //reboot the camera
                 client.RebootCamera();
                 if (returnCode != "pass")
                 {
-                    sb.Append("Error rebooting camera " + jobConfiguration.CertificateStoreDetails.ClientMachine + " with error code " + returnCode);
+                    errorMessage = $"Error rebooting camera {cameraUrl} with error code {returnCode}";
+                    _logger.LogError(errorMessage);
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = errorMessage
+                    };
                 }
 
                 return new JobResult
                 {
                     Result = OrchestratorJobStatusJobResult.Success,
                     JobHistoryId = jobConfiguration.JobHistoryId,
-                    FailureMessage = sb.ToString()
+                    FailureMessage = ""
                 };
             }
             catch (Exception e)
             {
                 _logger.LogError($"PerformReenrollment Error: {e.Message}");
-                throw;
+                return new JobResult
+                {
+                    Result = OrchestratorJobStatusJobResult.Failure,
+                    JobHistoryId = jobConfiguration.JobHistoryId,
+                    FailureMessage = e.Message
+                };
             }
             
         }

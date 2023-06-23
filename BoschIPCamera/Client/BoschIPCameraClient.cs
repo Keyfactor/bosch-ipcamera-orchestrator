@@ -9,6 +9,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml;
+using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Extensions;
 using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -42,21 +43,12 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 _cameraUrl = $"http://{store.ClientMachine}/rcp.xml?";
             }
 
-            // TODO: validate SSL cert
-            // This will ignore certificate errors in test mode since we don't have a valid cert for the camera on the public IP
-            //var handler = new HttpClientHandler
-            //{
-            //    ServerCertificateCustomValidationCallback = (sender, cert, chain, sslPolicyErrors) => { return true; }
-            //};
-            //ServicePointManager.ServerCertificateValidationCallback = (obj, certificate, chain, errors) => { return true; };
-
             var username = ResolvePamField(pam, config.ServerUsername, "Server Username");
             var password = ResolvePamField(pam, config.ServerPassword, "Server Password");
 
             var credentials = $"{username}:{password}";
             var encodedCredentials = Convert.ToBase64String(Encoding.ASCII.GetBytes(credentials));
 
-            //_client = new HttpClient(handler);
             _client = new HttpClient();
             _client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", encodedCredentials);
 
@@ -69,6 +61,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         public Dictionary<string, string> ListCerts()
         {
+            _logger.MethodEntry(LogLevel.Debug);
             var api = Constants.API.BuildRequestUri(
                 Constants.API.Endpoints.CERTIFICATE_LIST,
                 Constants.API.Type.P_OCTET,
@@ -93,6 +86,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         public string CertCreate(Dictionary<string, string> subject, string certificateName)
         {
+            _logger.MethodEntry(LogLevel.Debug);
             try
             {
                 var myId = HexadecimalEncoding.ToHexNoPadding(certificateName);
@@ -178,6 +172,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         public string DownloadCsrFromCamera(string certName)
         {
+            _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace("Download " + certName + " CSR from Camera: " + _cameraUrl);
             var haveCsr = false;
             var count = 0;
@@ -204,6 +199,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         public void UploadCert(string fileName, string fileData)
         {
+            _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace("Starting Cert upload to camera " + _baseUrl);
 
             var boundary = "----------" + DateTime.Now.Ticks.ToString("x");
@@ -275,15 +271,13 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             s.Write(bytes, 0, bytes.Length);
         }
 
-        private async Task Download(string certName,
-            string paramString = "")
+        private async Task Download(string certName, string paramString = "")
         {
             var source = new CancellationTokenSource();
             var token = source.Token;
 
-            _logger.LogTrace("Initializing HttpClient for CSR Download");
             var cameraUrl = $"{_baseUrl}/cert_download/{certName.Replace(" ", "%20")}.pem{paramString}";
-            _logger.LogTrace("Camera URL: " + cameraUrl);
+            _logger.LogTrace("Camera URL for download: " + cameraUrl);
 
             _response = await _client.GetAsync(cameraUrl, token);
 
@@ -293,6 +287,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         //Enable/Disable 802.1x setting on the camera
         public string Change8021XSettings(string onOffSwitch)
         {
+            _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace("Changing Camera 802.1x setting to " + onOffSwitch + " on Camera: " + _cameraUrl);
 
             try
@@ -341,6 +336,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         public string RebootCamera()
         {
+            _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace("Rebooting camera : " + _cameraUrl);
 
             try
@@ -387,6 +383,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         // get the cert usage
         public Dictionary<string, string> GetCertUsageList()
         {
+            _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace($"Get cert usage list for camera " + _cameraUrl);
 
             // list of cert usage types
@@ -456,6 +453,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         //set the cert usage on a cert
         public string SetCertUsage(string certName, Constants.CertificateUsage usageCode)
         {
+            _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace($"Setting cert usage to {usageCode.ToReadableText()} for cert {certName} for camera {_cameraUrl}");
             var payload = "0x00080000" + usageCode.ToUsageCode();
             var myId = HexadecimalEncoding.ToHexNoPadding(certName);
@@ -506,6 +504,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         //Delete the cert by name
         public string DeleteCertByName(string certName)
         {
+            _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace("Delete cert " + certName + " for camera " + _cameraUrl);
             var myId = HexadecimalEncoding.ToHexNoPadding(certName);
             var payload = HexadecimalEncoding.ToHexWithPrefix(certName, 4, '0') + "0000" + myId +
@@ -563,6 +562,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         public List<string> GetCameraCertList(string response)
         {
+            _logger.MethodEntry(LogLevel.Debug);
             var xmlResponse = new XmlDocument();
             xmlResponse.LoadXml(response);
 
@@ -584,6 +584,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         public Dictionary<string, string> ParseStringListResponse(string response)
         {
+            _logger.MethodEntry(LogLevel.Debug);
             var xmlResponse = new XmlDocument();
             xmlResponse.LoadXml(response);
 
@@ -630,7 +631,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         private string ResolvePamField(IPAMSecretResolver pam, string key, string fieldName)
         {
-            _logger.LogDebug($"Attempting to resolve PAM eligible field: '{fieldName}'");
+            _logger.LogTrace($"Attempting to resolve PAM eligible field: '{fieldName}'");
             return string.IsNullOrEmpty(key) ? key : pam.Resolve(key);
         }
     }
