@@ -1,4 +1,18 @@
-﻿using System;
+﻿// Copyright 2023 Keyfactor
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -16,8 +30,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 {
-    //todo better error handling and logging
-    //todo, low priority do we need a client library wrapper for bosch calls so we don't have to reference hex right in the main code and have it more readable as to what it is doing?
     public class BoschIpCameraClient
     {
         private readonly string _cameraUrl;
@@ -105,7 +117,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 payload += requesttype;
 
                 // CN is expected
-                // TODO: add logging error if no CN added
                 var myCommon = HexadecimalEncoding.ToHexWithPadding(subject["CN"]);
                 payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["CN"], 4, '0')}0005{myCommon}";
 
@@ -187,7 +198,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             while (!haveCsr && count <= 30)
                 try
                 {
-                    //todo find a better way to do this or at least make sleep and count configurable
                     Thread.Sleep(5000);
                     count++;
                     Download(certName, "?type=csr").Wait();
@@ -436,12 +446,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             if (!_response.IsSuccessStatusCode)
                 throw new Exception($"Request failed with status code {_response.StatusCode}");
 
-            // TODO: remove tracing
             var responseText = _response.Content.ReadAsStringAsync().Result;
-            _logger.LogTrace($"Trace of response for cert usage {usage.ToReadableText()} : \n\n {responseText} \n");
 
             var taggedResponses = ParseStringListResponse(responseText);
-            _logger.LogTrace($"Parse response count: {taggedResponses.Count}");
 
             if (taggedResponses.Count == 2)
             {
