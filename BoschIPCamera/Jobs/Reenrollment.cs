@@ -38,20 +38,19 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             try
             {
                 _logger.MethodEntry(LogLevel.Debug);
-                // TODO: CANNOT log entire config
-                _logger.LogTrace($"Reenrollment Config {JsonConvert.SerializeObject(jobConfiguration)}");
 
                 var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 
-                // TODO: safe check required field is present
-                var certName = jobConfiguration.JobProperties["Name"].ToString();
+                string certName = GetRequiredReenrollmentField(jobConfiguration.JobProperties, "Name").ToString();
+                bool overwrite = (bool) GetRequiredReenrollmentField(jobConfiguration.JobProperties, "Overwrite");
+                string csrInput = GetRequiredReenrollmentField(jobConfiguration.JobProperties, "subjectText").ToString();
+                string certUsage = GetRequiredReenrollmentField(jobConfiguration.JobProperties, "CertificateUsage").ToString();
 
                 string returnCode;
                 string errorMessage;
                 string cameraUrl = jobConfiguration.CertificateStoreDetails.ClientMachine;
 
                 // delete existing certificate if overwriting
-                var overwrite = (bool) jobConfiguration.JobProperties["Overwrite"];
                 if (overwrite)
                 {
                     returnCode = client.DeleteCertByName(certName);
@@ -70,7 +69,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 }
 
                 // setup the CSR details
-                var csrSubject = SetupCsrSubject(jobConfiguration.JobProperties["subjectText"].ToString());
+                var csrSubject = SetupCsrSubject(csrInput);
 
                 //generate the CSR on the camera
                 returnCode = client.CertCreate(csrSubject, certName);
@@ -149,10 +148,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                     };
                 }
 
-                //set cert usage
-                // TODO: safe check required field is present (before doing all reenrollment work above)
-                var certUsage = jobConfiguration.JobProperties["CertificateUsage"].ToString();
-
+                // set cert usage
                 Constants.CertificateUsage usageEnum = Constants.ParseCertificateUsage(certUsage);
 
                 returnCode = client.SetCertUsage(certName, usageEnum);
@@ -201,6 +197,34 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             }
             
         }
+
+        private object GetRequiredReenrollmentField(Dictionary<string, object> jobProperties, string fieldName)
+        {
+            _logger.LogTrace($"Checking for required field '{fieldName}' in Reenrollment Job Properties");
+
+            if (jobProperties.ContainsKey(fieldName))
+            {
+                var requiredField = jobProperties[fieldName];
+                if (requiredField != null)
+                {
+                    _logger.LogTrace($"Required field '{fieldName}' found with value '{requiredField}");
+                    return requiredField;
+                }
+                else
+                {
+                    string message = $"Required field '{fieldName}' was present in Reenrollment Job Properties but had no value";
+                    _logger.LogError(message);
+                    throw new MissingFieldException(message);
+                }
+            }
+            else
+            {
+                string message = $"Required field '{fieldName}' was not present in the Reenrollment Job Properties";
+                _logger.LogError(message);
+                throw new MissingFieldException(message);
+            }
+        }
+
         private Dictionary<string, string> SetupCsrSubject(string subjectText)
         {
             var csrSubject = new Dictionary<string, string>();
