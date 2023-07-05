@@ -14,6 +14,7 @@ using System.IO;
 using System.Net.Http;
 using Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs;
 
+//todo make this test console better or remove it, it is not too useful as is
 namespace BoschIPCameraTestConsole
 {
     struct enrollResponse
@@ -94,7 +95,7 @@ namespace BoschIPCameraTestConsole
                     }, null);
                     while (!y.IsCompleted)
                     {
-                        Thread.Sleep(1000);
+                        Thread.Sleep(1000); //todo better way to do this or make sleep configurable
                     }
                 }
                 catch (Exception e)
@@ -104,11 +105,11 @@ namespace BoschIPCameraTestConsole
             }, httpWebRequest);
             while (y == null || !y.IsCompleted)
             {
-                Thread.Sleep(100);
+                Thread.Sleep(100); //todo better way to do this or make sleep configurable
             }
             while (!x.IsCompleted)
             {
-                Thread.Sleep(100);
+                Thread.Sleep(100); //todo better way to do this or make sleep configurable
             }
         }
 
@@ -199,7 +200,7 @@ namespace BoschIPCameraTestConsole
             //  ILoggerFactory invLoggerFactory = new LoggerFactory();
             //   ILogger<Reenrollment> invLogger = invLoggerFactory.CreateLogger<Reenrollment>();
 
-            BoschIPcameraClient client = new BoschIPcameraClient();
+            //BoschIpCameraClient client = new BoschIpCameraClient();
             String returnCode = "";
 
             //generate the CSR on the camera
@@ -207,9 +208,9 @@ namespace BoschIPCameraTestConsole
             //client.setupStandardBoschIPcameraClient("166.145.144.73:10080", "service", "DHStrp2022!", setupCSRSubject());
 
             //delete cert if it exists
-            //returnCode = client.deleteCertByName("keyfactor");
+            //returnCode = client.DeleteCertByName("keyfactor");
 
-            //    returnCode = client.certCreate("keyfactor");
+            //    returnCode = client.CertCreate("keyfactor");
 
             if (returnCode == "pass")
             {
@@ -226,12 +227,12 @@ namespace BoschIPCameraTestConsole
             if (returnCode == "pass")
             {
                 //set cert usage
-           //   returnCode = client.setCertUsage("HTTPSCert", "80000000");
+           //   returnCode = client.SetCertUsage("HTTPSCert", "80000000");
 
                 if (returnCode == "pass")
                 {
                     //reboot camera
-              //      returnCode = client.rebootCamera();
+              //      returnCode = client.RebootCamera();
                 }
             }
 
