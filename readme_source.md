@@ -18,7 +18,7 @@ In Keyfactor Command create a new Certificate Store Type similar to the one belo
 
 #### STORE TYPE CONFIGURATION
 | Setting Tab | Config Element | Value |
-|-|-|-|-|
+|-|-|-|
 | Basic | Name | Bosch IP Camera |
 | Basic | Short Name | BIPCamera |
 | Basic | Custom Capability | &check; value: `BoschIpCamera` |
