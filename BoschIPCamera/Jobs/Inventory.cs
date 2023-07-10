@@ -1,22 +1,37 @@
-using System;
+// Copyright 2023 Keyfactor
+// 
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+// 
+//     http://www.apache.org/licenses/LICENSE-2.0
+// 
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 using System.Collections.Generic;
 using System.Linq;
 using Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client;
 using Keyfactor.Logging;
 using Keyfactor.Orchestrators.Common.Enums;
 using Keyfactor.Orchestrators.Extensions;
+using Keyfactor.Orchestrators.Extensions.Interfaces;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
 
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 {
     public class Inventory : IInventoryJobExtension
     {
-        private readonly ILogger<Inventory> _logger;
+        private readonly ILogger _logger;
+        private readonly IPAMSecretResolver _pam;
 
-        public Inventory(ILogger<Inventory> logger)
+        public Inventory(IPAMSecretResolver pam)
         {
-            _logger = logger;
+            _logger = LogHandler.GetClassLogger<Inventory>();
+            _pam = pam;
         }
 
         public string ExtensionName => "BoschIPCamera";
@@ -25,31 +40,36 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             SubmitInventoryUpdate submitInventoryUpdate)
         {
             _logger.MethodEntry(LogLevel.Debug);
-            _logger.LogTrace($"Inventory Config {JsonConvert.SerializeObject(jobConfiguration)}");
-            boschIPCameraDetails storeProperties = JsonConvert.DeserializeObject<boschIPCameraDetails>(jobConfiguration.CertificateStoreDetails.Properties);
-            BoschIPcameraClient client = new BoschIPcameraClient();
+            var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 
-            //setup the Camera Details
-            _logger.LogDebug("Build default RestSharp client");
-            client.setupStandardBoschIPcameraClient(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
-                jobConfiguration.ServerPassword, null, _logger);
 
-            Dictionary<String, String> files = client.listCerts(jobConfiguration.CertificateStoreDetails.ClientMachine, jobConfiguration.ServerUsername,
-                jobConfiguration.ServerPassword);
-            List<CurrentInventoryItem> inventory = files.Select(f => new CurrentInventoryItem()
+            var files = client.ListCerts();
+            _logger.LogDebug($"Found {files.Count} certificates");
+
+            // get cert usage
+            // need request cert usage lists for each cert usage type, and parse names from response to match types
+            // key = cert name, value = cert usage enum
+            var certUsages = client.GetCertUsageList();
+            _logger.LogDebug($"Found {certUsages.Count} certificates with a matching usage");
+
+            var inventory = files.Select(f => new CurrentInventoryItem()
             {
                 Alias = f.Key,
                 Certificates = new List<string>() { f.Value },
                 PrivateKeyEntry = false,
-                UseChainLevel = false
-            }).ToList<CurrentInventoryItem>();
+                UseChainLevel = false,
+                Parameters = new Dictionary<string, object>
+                {
+                    { "Name", f.Key },
+                    { "CertificateUsage", certUsages.ContainsKey(f.Key) ? certUsages[f.Key].ToReadableText() : "" }
+                }
+            }).ToList();
             
-            // In the model where a bosch certstore represents just a single cert, this list needs to be trimmed.
-            // inventory = inventory.Where(i => i.Alias == jobConfiguration.CertificateStoreDetails.StorePath).ToList();
             submitInventoryUpdate(inventory);
             return new JobResult()
             {
                 Result = OrchestratorJobStatusJobResult.Success,
+                JobHistoryId = jobConfiguration.JobHistoryId,
                 FailureMessage = ""
             };
         }
