@@ -5,10 +5,6 @@
         "assemblypath": "BoschIPCamera.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs.Inventory"
       },
-      "CertStores.BoschIpCamera.Management": {
-        "assemblypath": "BoschIPCamera.dll",
-        "TypeFullName": "Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs.Management"
-      },
       "CertStores.BoschIpCamera.Reenrollment": {
         "assemblypath": "BoschIPCamera.dll",
         "TypeFullName": "Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs.Reenrollment"
