@@ -2,17 +2,18 @@
   "$schema": "https://keyfactor.github.io/integration-manifest-schema.json",
   "integration_type": "orchestrator",
   "name": "Bosch IP Camera",
-  "status": "prototype",
-  "link_github": true,
-  "description": "Bosch IP Camera Orchestrator for Add, Remove and Inventory",
+  "status": "production",
+  "update_catalog": false,
+  "link_github": false,
+  "description": "Bosch IP Camera Orchestrator for Inventory and Reenrollment (on-device keygen) for existing and new certificates",
   "about": {
     "orchestrator": {
       "win": {
         "supportsCreateStore": false,
         "supportsDiscovery": false,
-        "supportsManagementAdd": true,
-        "supportsManagementRemove": true,
-        "supportsReenrollment": false,
+        "supportsManagementAdd": false,
+        "supportsManagementRemove": false,
+        "supportsReenrollment": true,
         "supportsInventory": true,
         "platformSupport": "Unused"
       },
