@@ -6,7 +6,7 @@
   "update_catalog": true,
   "link_github": true,
   "support_level": "kf-supported",
-  "release_dir": "BoschIPCamera/obj/Release/netcoreapp3.1",
+  "release_dir": "BoschIPCamera/bin/Release/netcoreapp3.1",
   "description": "Bosch IP Camera Orchestrator for Inventory and Reenrollment (on-device keygen) for existing and new certificates",
   "about": {
     "orchestrator": {
