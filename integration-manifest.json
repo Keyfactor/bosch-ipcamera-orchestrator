@@ -3,8 +3,8 @@
   "integration_type": "orchestrator",
   "name": "Bosch IP Camera",
   "status": "production",
-  "update_catalog": false,
-  "link_github": false,
+  "update_catalog": true,
+  "link_github": true,
   "description": "Bosch IP Camera Orchestrator for Inventory and Reenrollment (on-device keygen) for existing and new certificates",
   "about": {
     "orchestrator": {
