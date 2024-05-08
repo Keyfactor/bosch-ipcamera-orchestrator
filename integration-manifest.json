@@ -30,7 +30,95 @@
         "supportsReenrollment": false,
         "supportsInventory": false,
         "platformSupport": "Unused"
-      }
+      },
+      "store_types": [
+        {
+          "Name": "Bosch IP Camera",
+          "ShortName": "BIPCamera",
+          "Capability": "BIPCamera",
+          "LocalStore": false,
+          "SupportedOperations": {
+            "Add": true,
+            "Create": false,
+            "Discovery": false,
+            "Enrollment": true,
+            "Remove": true
+          },
+          "Properties": [
+            {
+              "Name": "ServerUsername",
+              "DisplayName": "Server Username",
+              "Type": "Secret",
+              "DependsOn": null,
+              "DefaultValue": null,
+              "Required": false
+            },
+            {
+              "Name": "ServerPassword",
+              "DisplayName": "Server Password",
+              "Type": "Secret",
+              "DependsOn": null,
+              "DefaultValue": null,
+              "Required": false
+            },
+            {
+              "Name": "ServerUseSsl",
+              "DisplayName": "Use SSL",
+              "Type": "Bool",
+              "DependsOn": null,
+              "DefaultValue": "true",
+              "Required": true
+            }
+          ],
+          "EntryParameters": [
+            {
+              "Name": "CertificateUsage",
+              "DisplayName": "Certificate Usage",
+              "Type": "MultipleChoice",
+              "RequiredWhen": {
+                "HasPrivateKey": false,
+                "OnAdd": false,
+                "OnRemove": false,
+                "OnReenrollment": false
+              },
+              "Options": ",HTTPS,EAP-TLS-client,TLS-DATE-client"
+            },
+            {
+              "Name": "Name",
+              "DisplayName": "Name (Alias)",
+              "Type": "String",
+              "RequiredWhen": {
+                "HasPrivateKey": false,
+                "OnAdd": false,
+                "OnRemove": false,
+                "OnReenrollment": true
+              }
+            },
+            {
+              "Name": "Overwrite",
+              "DisplayName": "Overwrite",
+              "Type": "Bool",
+              "RequiredWhen": {
+                "HasPrivateKey": false,
+                "OnAdd": false,
+                "OnRemove": false,
+                "OnReenrollment": false
+              },
+              "DefaultValue": "false"
+            }
+          ],
+          "PasswordOptions": {
+            "EntrySupported": false,
+            "StoreRequired": false,
+            "Style": "Default"
+          },
+          "PrivateKeyAllowed": "Optional",
+          "ServerRequired": true,
+          "PowerShell": false,
+          "BlueprintAllowed": true,
+          "CustomAliasAllowed": "Required"
+        }
+      ]
     }
   }
 }
