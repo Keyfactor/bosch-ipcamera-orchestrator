@@ -38,7 +38,7 @@ The Keyfactor Universal Orchestrator may be installed on either Windows or Linux
 |Supports Management Remove|  |  |
 |Supports Create Store|  |  |
 |Supports Discovery|  |  |
-|Supports Renrollment|&check; |  |
+|Supports Reenrollment|&check; |  |
 |Supports Inventory|&check; |  |
 
 
@@ -158,4 +158,7 @@ Locations   |Token |locations:certstore
 ScriptName  |Script |ExpirationAlertHandler.ps1
 
 ![](images/ExpirationAlerts.gif)
+
+When creating cert store type manually, that store property names and entry parameter names are case sensitive
+
 
