@@ -104,6 +104,7 @@ The entry parameters that need to be created are as follows:
 ![](images/entry-overwrite.png)
 
 **2. Register the BoschIPCamera Universal Orchestrator with Keyfactor**
+
 Within Windows File Explorer, navigate to the Keyfactor Orchestrator installation folder (usually C:\Program Files\Keyfactor\Keyfactor Orchestrator), find the "extensions" folder, and under that create a new folder named "BoschIPCamera". Under the BoschIPCamera folder copy all of the files from the downloaded release to this location.
 
 **3. Create a Bosch IP Camera Store within Keyfactor Command**
@@ -144,12 +145,17 @@ The serial number is entered as the Store Path on the Certificate Store, and sho
 ![](images/reenrollment-example.png)
 
 Running a Reenrollment job to issue a new certificate on the camera can happen in two ways. 
-1. Right click on the cert store and chooose Reenrollment. In the dialog box, type "CN=Test" and click Done. A job will be created in the job queue that will perform on camera CSR that will be signed by a CA integrated with Keyfactor and then uploaded to the camera. Once complete, the camera will be rebooted. 
-2. For auto renewals with Expiration Workflow
-    a. Install ExperationAlertHandler.ps1 on Command server in C:\Program Files\Keyfactor\ExtensionLibrary
-    b. Create a collection for each certificate type (or one for all cert types) used on cameras. Create an exiration alert and configure the Event Handler similar to the one below.
+##### Manual Reenrollment Scheduling
+Right click on the cert store and chooose Reenrollment. In the dialog box, type "SERIALNUMBER=xxxx,CN=Test" and click Done. A job will be created in the job queue that will perform on camera CSR that will be signed by a CA integrated with Keyfactor and then uploaded to the camera. Once complete, the camera will be rebooted. 
+##### Automated Reenrollment Scheduling with Expiration Alerts
+Start by installing the ExperationAlertHandler.ps1 on the Command server.
+
+__Keyfactor Command before version 11__: copy the PowerShell to the ExtensionLibrary folder in the install location, typically `C:\Program Files\Keyfactor\ExtensionLibrary`
+__Keyfactor Command version 11+__: upload the script using the API [documented here](https://software.keyfactor.com/Core-OnPrem/v11.5/Content/ReferenceGuide/PowerShellScripts.htm) so it can be used in an Expiration Alert Handler
+
+After installing the PowerShell script, create a collection for each certificate type (or one for all cert types) used on cameras. Create an expiration alert and configure the Event Handler similar to the one below.
   
-  #### Event Handler Configuration 
+##### Event Handler Configuration 
 Parameter Name	|Type           |Value
 ----------------|---------------|------------
 DN	    |Token  |dn
