@@ -1,5 +1,8 @@
-1.0.3
+1.0.4
 - Initial Public release
+
+1.0.3
+- Initial Internal/Private release
 - Supports Inventory and Reenrollment jobs
 - Allows Certificate Usage codes:
     - None
