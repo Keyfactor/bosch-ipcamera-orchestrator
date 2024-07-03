@@ -111,8 +111,8 @@ The following table describes the required and optional fields for the `BIPCamer
 | --------- | ----------- | ------------------------- |
 | Category | Select "Bosch IP Camera" or the customized certificate store name from the previous step. | |
 | Container | Optional container to associate certificate store with. | |
-| Client Machine | For the Client Machine field, enter the IP address of the Bosch IP Camera, including the port if necessary. Example: '192.167.231.174:44444'. | |
-| Store Path | For the Store Path field, enter the Serial Number of the Bosch IP Camera. Example: '068745431065110085'. | |
+| Client Machine | The IP address of the Bosch IP Camera, optionally including the port number if necessary. Example: '192.167.231.174:44444'. | |
+| Store Path | The serial number of the Bosch IP Camera. Example: '068745431065110085'. | |
 | Orchestrator | Select an approved orchestrator capable of managing `BIPCamera` certificates. Specifically, one with the `BIPCamera` capability. | |
 
 * **Using kfutil**

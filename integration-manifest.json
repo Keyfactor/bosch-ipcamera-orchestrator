@@ -1,5 +1,5 @@
 {
-    "$schema": "/Users/hroszell/coding/dev/staff-tools/keyfactor.github.io/v2/integration-manifest-schema.json",
+    "$schema": "https://keyfactor.github.io/v2/integration-manifest-schema.json",
     "integration_type": "orchestrator",
     "name": "Bosch IP Camera",
     "status": "production",
@@ -7,30 +7,12 @@
     "link_github": true,
     "support_level": "kf-supported",
     "release_dir": "BoschIPCamera/bin/Release/netcoreapp3.1",
-    "description": "Bosch IP Camera Orchestrator for Inventory and Reenrollment (on-device keygen) for existing and new certificates",
+    "description": "The Bosch IP Camera Universal Orchestrator extension enables the remote management of cryptographic certificates on Bosch IP Cameras, including inventory, reenrollment, and automated handling of certificate expiration.",
     "about": {
         "orchestrator": {
             "UOFramework": "10.1",
             "keyfactor_platform_version": "9.10",
             "pam_support": false,
-            "win": {
-                "supportsCreateStore": false,
-                "supportsDiscovery": false,
-                "supportsManagementAdd": false,
-                "supportsManagementRemove": false,
-                "supportsReenrollment": true,
-                "supportsInventory": true,
-                "platformSupport": "Unused"
-            },
-            "linux": {
-                "supportsCreateStore": false,
-                "supportsDiscovery": false,
-                "supportsManagementAdd": false,
-                "supportsManagementRemove": false,
-                "supportsReenrollment": false,
-                "supportsInventory": false,
-                "platformSupport": "Unused"
-            },
             "store_types": [
                 {
                     "Name": "Bosch IP Camera",
@@ -56,8 +38,8 @@
                     "PowerShell": false,
                     "BlueprintAllowed": true,
                     "CustomAliasAllowed": "Required",
-                    "ClientMachineDescription": "For the Client Machine field, enter the IP address of the Bosch IP Camera, including the port if necessary. Example: '192.167.231.174:44444'.",
-                    "StorePathDescription": "For the Store Path field, enter the Serial Number of the Bosch IP Camera. Example: '068745431065110085'."
+                    "ClientMachineDescription": "The IP address of the Bosch IP Camera, optionally including the port number if necessary. Example: '192.167.231.174:44444'.",
+                    "StorePathDescription": "The serial number of the Bosch IP Camera. Example: '068745431065110085'."
                 }
             ]
         }
