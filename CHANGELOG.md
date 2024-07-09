@@ -1,3 +1,7 @@
+1.0.5
+- Add examples of store creation using Keyfactor Command Terraform provider
+- Fix `integration-manifest.json` store-type definition to reflect docs
+
 1.0.4
 - Initial Public release
 
