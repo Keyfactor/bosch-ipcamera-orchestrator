@@ -35,14 +35,14 @@
         {
           "Name": "Bosch IP Camera",
           "ShortName": "BIPCamera",
-          "Capability": "BIPCamera",
+          "Capability": "BoschIpCamera",
           "LocalStore": false,
           "SupportedOperations": {
-            "Add": true,
+            "Add": false,
             "Create": false,
             "Discovery": false,
             "Enrollment": true,
-            "Remove": true
+            "Remove": false
           },
           "Properties": [
             {
