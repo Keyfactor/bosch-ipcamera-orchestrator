@@ -1,4 +1,4 @@
-# Multiple BoschIPCamera Store Creation Example
+# Multiple BoschIPCamera Store Creation using Same Credentials Example
 
 This is an example of how to create multiple camera stores in Keyfactor Command using the Keyfactor Terraform provider.
 
