@@ -23,6 +23,51 @@ terraform plan
 terraform apply
 ```
 
+### Generate tfvars file from CSV
+Alternatively, you can generate the `.tfvars` file from a CSV file using the template `example.csv` and running the 
+python script `csv2tfvars.py`. This script will generate a `.tfvars` based on the inputs of the CSV file.
+
+#### Usage
+```text
+python csv2tfvars.py -h
+usage: csv2tfvars.py [-h] -csv CSV_FILE -orch ORCHESTRATOR_NAME [-i] [output_tfvars_file]
+
+    Convert CSV to TFVARS. This script parses a given CSV file containing camera information and generates a Terraform variables file (.tfvars) with the data structured for Terraform usage.
+
+    Usage:
+        csv2tfvars.py -csv <input_csv_file> -orch <orchestrator_name> [output_tfvars_file] [-i]
+        csv2tfvars.py --help
+
+    The -i flag enables interactive mode, prompting for any missing required inputs.
+
+positional arguments:
+  output_tfvars_file    Output TFVARS file path. Optional, defaults to BoschIPCameraStores.tfvars.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -csv CSV_FILE, --csv_file CSV_FILE
+                        Path to the input CSV file. Required unless in interactive mode.
+  -orch ORCHESTRATOR_NAME, --orchestrator_name ORCHESTRATOR_NAME
+                        Orchestrator name. Required unless in interactive mode.
+  -i, --interactive     Run in interactive mode. Prompts for missing inputs.
+```
+
+#### Interactive Example
+```bash
+python csv2tfvars.py -i
+```
+```text
+Enter the input CSV file path: example.csv
+Enter the orchestrator_name: my-uo-client-name
+Enter the output TFVARS file path (default is 'BoschIPCameraStores.tfvars'):
+TFVARS file generated: BoschIPCameraStores.tfvars
+```
+
+#### Non-Interactive Example
+```bash
+python csv2tfvars.py -csv example.csv -orch my-uo-client-name
+```
+
 <!-- BEGIN_TF_DOCS -->
 ## Requirements
 
