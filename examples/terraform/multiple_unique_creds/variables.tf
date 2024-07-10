@@ -18,7 +18,7 @@ variable "orchestrator_name" {
 }
 
 variable "camera_map" {
-  type        = map(object({
+  type = map(object({
     ip       = string
     username = string
     password = string

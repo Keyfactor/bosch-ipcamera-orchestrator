@@ -13,9 +13,9 @@
 # limitations under the License.
 
 resource "keyfactor_certificate_store" "bosch_camera_store" {
-  for_each = var.camera_map
-  client_machine     = each.value.ip//this is camera IP
-  store_path         = each.key //this is camera serial number
+  for_each           = var.camera_map
+  client_machine = each.value.ip //this is camera IP
+  store_path = each.key //this is camera serial number
   agent_identifier   = data.keyfactor_agent.universal_orchestrator.agent_identifier
   store_type = "BIPCamera" # Must exist in KeyFactor Command
   server_username    = each.value.username

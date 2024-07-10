@@ -18,7 +18,7 @@ variable "orchestrator_name" {
 }
 
 variable "camera_map" {
-  type        = map(string)
+  type = map(string)
   description = "A map containing the serial number to IP address of the cameras to be enrolled"
 }
 

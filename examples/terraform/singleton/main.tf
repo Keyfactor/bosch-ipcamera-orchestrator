@@ -16,7 +16,7 @@ resource "keyfactor_certificate_store" "bosch_camera_store" {
   client_machine     = var.camera_ip
   store_path         = var.camera_serial_number
   agent_identifier   = data.keyfactor_agent.universal_orchestrator.agent_identifier
-  store_type         = "BIPCamera" # Must exist in KeyFactor Command
+  store_type = "BIPCamera" # Must exist in KeyFactor Command
   server_username    = var.server_username
   server_password    = var.server_password
   server_use_ssl     = var.server_use_ssl
