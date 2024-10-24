@@ -148,23 +148,26 @@ Running a Reenrollment job to issue a new certificate on the camera can happen i
 ##### Manual Reenrollment Scheduling
 Right click on the cert store and chooose Reenrollment. In the dialog box, type "SERIALNUMBER=xxxx,CN=Test" and click Done. A job will be created in the job queue that will perform on camera CSR that will be signed by a CA integrated with Keyfactor and then uploaded to the camera. Once complete, the camera will be rebooted. 
 ##### Automated Reenrollment Scheduling with Expiration Alerts
-Start by installing the ExperationAlertHandler.ps1 on the Command server.
 
 __Keyfactor Command before version 11__: copy the PowerShell to the ExtensionLibrary folder in the install location, typically `C:\Program Files\Keyfactor\ExtensionLibrary`
 
 __Keyfactor Command version 11+__: upload the script using the API [documented here](https://software.keyfactor.com/Core-OnPrem/v11.5/Content/ReferenceGuide/PowerShellScripts.htm) so it can be used in an Expiration Alert Handler
 
-After installing the PowerShell script, create a collection for each certificate type (or one for all cert types) used on cameras. Create an expiration alert and configure the Event Handler similar to the one below.
+A sample script is provided to get started with configuring an `ExpirationPowershell` alert. It needs to be updated with the correct URL for API requests, and may need other changes as well, as it assumes that Default Credentials (Windows Auth) can be used to authenticate API requests to the Keyfactor instance.
+
+After installing the PowerShell script, create a collection for each certificate type (or one for all cert types) used on cameras. The `ExpirationPowershell` Event Handler configuration should be configured with the following values:
   
 ##### Event Handler Configuration 
-Parameter Name	|Type           |Value
-----------------|---------------|------------
-DN	    |Token  |dn
-Host    |Value  |FDDN of keyfactor server. Example: https://customer.keyfactor.com
-Locations   |Token |locations:certstore
-ScriptName  |Script |ExpirationAlertHandler.ps1
+| Parameter Name | Type | Value |
+| - | - | - |
+| Thumbprint | Special Text | Thumbprint |
+| Template | Renewal Template | `desired renewal template` |
+| CAConfiguration | Renewal Certificate Authority | `desired renewal CA` |
+| ScriptName | PowerShell Script Name | BoschIPCameraExpirationHandler.ps1 |
 
-![](images/ExpirationAlerts.gif)
+When running the sample script, it will assume that all certs passed to the script should schedule a Reenrollment job with their existing parameters, and force an Overwrite of the existing cert.
+If the job should fail to upload a new certificate, the existing certificate may have been deleted and there may no longer be a valid certificate available when using Overwrite.
+
 
 When creating cert store type manually, that store property names and entry parameter names are case sensitive
 
