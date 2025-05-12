@@ -54,13 +54,26 @@ Before installing the Bosch IP Camera Universal Orchestrator extension, we recom
 2. Currently supports Bosch firmware version 7.10.0095 - 7.82. Has not been tested with any other firmeware version.
 
 
-## Create the BIPCamera Certificate Store Type
+## BIPCamera Certificate Store Type
 
 To use the Bosch IP Camera Universal Orchestrator extension, you **must** create the BIPCamera Certificate Store Type. This only needs to happen _once_ per Keyfactor Command instance.
 
 
 
-### Using kfutil:
+
+### Supported Operations
+
+| Operation    | Is Supported                                                                                                           |
+|--------------|------------------------------------------------------------------------------------------------------------------------|
+| Add          | 🔲 Unchecked        |
+| Remove       | 🔲 Unchecked     |
+| Discovery    | 🔲 Unchecked  |
+| Reenrollment | ✅ Checked |
+| Create       | 🔲 Unchecked     |
+
+### Creation Using kfutil:
+`kfutil` is a custom CLI for the Keyfactor Command API and can be used to created certificate store types.
+For more information on [kfutil](https://github.com/Keyfactor/kfutil) check out the [docs](https://github.com/Keyfactor/kfutil?tab=readme-ov-file#quickstart)
 
 #### Using online definition from GitHub:
 This will reach out to GitHub and pull the latest store-type definition
@@ -71,11 +84,15 @@ kfutil store-types create BIPCamera
 
 #### Offline creation using integration-manifest file:
 If required, it is possible to create store types from the [integration-manifest.json](./integration-manifest.json) included in this repo.
+You would first download the [integration-manifest.json](./integration-manifest.json) and then run the following command
+in your offline environment.
 ```shell
 kfutil store-types create --from-file integration-manifest.json
 ```
 
-### Manually
+### Manual Creation
+If you do not wish to use the `kfutil` CLI then certificate store types can be creating in the web UI as described below.
+
 * **Create BIPCamera manually in the Command UI**:
     <details><summary>Create BIPCamera manually in the Command UI</summary>
 
@@ -127,8 +144,6 @@ kfutil store-types create --from-file integration-manifest.json
     The Custom Fields tab should look like this:
 
     ![BIPCamera Custom Fields Tab](docsource/images/BIPCamera-custom-fields-store-type-dialog.png)
-
-
 
     #### Entry Parameters Tab
 
