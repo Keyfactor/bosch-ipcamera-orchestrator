@@ -29,7 +29,7 @@
             "Create": false,
             "Discovery": false,
             "Enrollment": true,
-            "Remove": true
+            "Remove": false
           },
           "PasswordOptions": {
             "EntrySupported": false,
