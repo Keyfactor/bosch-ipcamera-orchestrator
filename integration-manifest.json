@@ -44,7 +44,7 @@
               "DependsOn": "",
               "DefaultValue": "",
               "Required": false,
-              "Descripton": "Enter the username of the configured \"service\" user on the camera"
+              "Description": "Enter the username of the configured \"service\" user on the camera"
             },
             {
               "Name": "ServerPassword",
@@ -53,7 +53,7 @@
               "DependsOn": "",
               "DefaultValue": "",
               "Required": false,
-              "Descripton": "Enter the password of the configured \"service\" user on the camera"
+              "Description": "Enter the password of the configured \"service\" user on the camera"
             },
             {
               "Name": "ServerUseSsl",
@@ -62,7 +62,7 @@
               "DependsOn": "",
               "DefaultValue": "true",
               "Required": true,
-              "Descripton": "Select True or False depending on if SSL (HTTPS) should be used to communicate with the camera."
+              "Description": "Select True or False depending on if SSL (HTTPS) should be used to communicate with the camera."
             }
           ],
           "EntryParameters": [
@@ -76,7 +76,8 @@
                 "OnRemove": false,
                 "OnReenrollment": false
               },
-              "Options": ",HTTPS,EAP-TLS-client,TLS-DATE-client"
+              "Options": ",HTTPS,EAP-TLS-client,TLS-DATE-client",
+              "Description": "The Certificate Usage to assign to the cert after upload. Can be left blank to be assigned later."
             },
             {
               "Name": "Name",
@@ -87,7 +88,8 @@
                 "OnAdd": false,
                 "OnRemove": false,
                 "OnReenrollment": true
-              }
+              },
+              "Description": "The certificate Alias, entered again."
             },
             {
               "Name": "Overwrite",
@@ -99,7 +101,8 @@
                 "OnRemove": false,
                 "OnReenrollment": false
               },
-              "DefaultValue": "false"
+              "DefaultValue": "false",
+              "Description": "Select `True` if using an existing Alias name to remove and replace an existing certificate."
             }
           ],
           "ClientMachineDescription": "The IP address of the Camera. Sample is \"192.167.231.174:44444\". Include the port if necessary.",
