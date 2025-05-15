@@ -1,3 +1,7 @@
+1.1.0
+- Added .net6/8 dual build
+- Modifications to support doctool for README
+
 1.0.4
 - Initial Public release
 
