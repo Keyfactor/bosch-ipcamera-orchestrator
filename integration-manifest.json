@@ -17,8 +17,8 @@
       "store_types": [
         {
           "Name": "Bosch IP Camera",
-          "ShortName": "BIPCamera",
-          "Capability": "BIPCamera",
+          "ShortName": "BoschIPCamera",
+          "Capability": "BoschIPCamera",
           "PrivateKeyAllowed": "Optional",
           "ServerRequired": true,
           "PowerShell": false,
