@@ -1,3 +1,9 @@
+1.1.1
+- Updated integration-manifest.json to use 'BoschIPCamera' for capability and short name so it matches manifest and code references
+- Renamed image files to reflect 'BoschIPCamera' cert store type shortname
+- Removed bipcamera.md
+- Removed TODOs from boschipcamera.md
+
 1.1.0
 - Added .net6/8 dual build
 - Modifications to support doctool for README
