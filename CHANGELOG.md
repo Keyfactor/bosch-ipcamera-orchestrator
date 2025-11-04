@@ -1,3 +1,6 @@
+1.1.2
+- Update doc screenshots
+
 1.1.1
 - Updated integration-manifest.json to use 'BoschIPCamera' for capability and short name so it matches manifest and code references
 - Renamed image files to reflect 'BoschIPCamera' cert store type shortname
