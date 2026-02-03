@@ -153,6 +153,37 @@ the Keyfactor Command Portal
 
    ![BoschIPCamera Custom Fields Tab](docsource/images/BoschIPCamera-custom-fields-store-type-dialog.png)
 
+
+   ###### Server Username
+   Enter the username of the configured "service" user on the camera
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+
+
+   ###### Server Password
+   Enter the password of the configured "service" user on the camera
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+
+
+   ###### Use SSL
+   Select True or False depending on if SSL (HTTPS) should be used to communicate with the camera.
+
+   ![BoschIPCamera Custom Field - ServerUseSsl](docsource/images/BoschIPCamera-custom-field-ServerUseSsl-dialog.png)
+   ![BoschIPCamera Custom Field - ServerUseSsl](docsource/images/BoschIPCamera-custom-field-ServerUseSsl-validation-options-dialog.png)
+
+
+
+
+
    ##### Entry Parameters Tab
 
    | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
@@ -165,21 +196,43 @@ the Keyfactor Command Portal
 
    ![BoschIPCamera Entry Parameters Tab](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog.png)
 
+
+   ##### Certificate Usage
+   The Certificate Usage to assign to the cert after upload. Can be left blank to be assigned later.
+
+   ![BoschIPCamera Entry Parameter - CertificateUsage](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-CertificateUsage.png)
+   ![BoschIPCamera Entry Parameter - CertificateUsage](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-CertificateUsage-validation-options.png)
+
+
+   ##### Name (Alias)
+   The certificate Alias, entered again.
+
+   ![BoschIPCamera Entry Parameter - Name](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-Name.png)
+   ![BoschIPCamera Entry Parameter - Name](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-Name-validation-options.png)
+
+
+   ##### Overwrite
+   Select `True` if using an existing Alias name to remove and replace an existing certificate.
+
+   ![BoschIPCamera Entry Parameter - Overwrite](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-Overwrite.png)
+   ![BoschIPCamera Entry Parameter - Overwrite](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-Overwrite-validation-options.png)
+
+
+
    </details>
 
 ## Installation
 
 1. **Download the latest Bosch IP Camera Universal Orchestrator extension from GitHub.**
 
-    Navigate to the [Bosch IP Camera Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/bosch-ipcamera-orchestrator/releases/latest). Refer to the compatibility matrix below to determine whether the `net6.0` or `net8.0` asset should be downloaded. Then, click the corresponding asset to download the zip archive.
+    Navigate to the [Bosch IP Camera Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/bosch-ipcamera-orchestrator/releases/latest). Refer to the compatibility matrix below to determine the asset should be downloaded. Then, click the corresponding asset to download the zip archive.
 
    | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `bosch-ipcamera-orchestrator` .NET version to download |
    | --------- | ----------- | ----------- | ----------- |
    | Older than `11.0.0` | | | `net6.0` |
    | Between `11.0.0` and `11.5.1` (inclusive) | `net6.0` | | `net6.0` |
-   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `Disable` | `net6.0` |
-   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `LatestMajor` | `net8.0` |
-   | `11.6` _and_ newer | `net8.0` | | `net8.0` |
+   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `Disable` | `net6.0` || Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `LatestMajor` | `net8.0` |
+   | `11.6` _and_ newer | `net8.0` | | `net8.0` | 
 
     Unzip the archive containing extension assemblies to a known location.
 
