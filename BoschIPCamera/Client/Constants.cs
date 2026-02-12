@@ -99,7 +99,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             {
                 "RSA" when keySize == "1024" => CertificateKeyType.RSA1024,
                 "RSA" when keySize == "2048" => CertificateKeyType.RSA2048,
-                "ECP" when keySize == "256" => CertificateKeyType.ECC256,
+                "ECDSA" when keySize == "256" => CertificateKeyType.ECC256,
                 "RSA" when keySize == "4096" => CertificateKeyType.RSA4096,
                 _ => CertificateKeyType.Unknown
             };

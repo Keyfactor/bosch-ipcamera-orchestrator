@@ -121,6 +121,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
                 // CN is expected
                 var myCommon = HexadecimalEncoding.ToHexWithPadding(subject["CN"]);
+                _logger.LogTrace($"Encoding CN '{subject["CN"]}' into camera payload");
                 payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["CN"], 4, '0')}0005{myCommon}";
 
                 if (subject.ContainsKey("O"))
@@ -281,34 +282,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 }
             }
         }
-        
-        // TODO: Started this here --- Used for dynamic mapping
-        /*
-        public Dictionary<string, string> ListCSRKeyTypes()
-        {
-            _logger.MethodEntry(LogLevel.Debug);
-            var api = Constants.API.BuildRequestUri(
-                Constants.API.Endpoints.CERTIFICATE_OPTIONS,
-                Constants.API.Type.P_OCTET,
-                Constants.API.Direction.READ
-            );
-            var requestUri = $"{_cameraUrl}{api}";
-
-            var request = new HttpRequestMessage(HttpMethod.Get, requestUri);
-
-            _logger.LogTrace($"Sending API request: {requestUri}");
-            var task = _client.SendAsync(request);
-            task.Wait();
-            var keytypes = GetCameraCertKeyTypes(task.Result.Content.ReadAsStringAsync().Result);
-            var files = new Dictionary<string, string>();
-            foreach (var c in cameras)
-            {
-                Download(c).Wait();
-                files.Add(c, _response.Content.ReadAsStringAsync().Result);
-            }
-
-            return files;
-        }*/
 
         private static void WriteToStream(Stream s, string txt)
         {
@@ -628,39 +601,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 certNames.Add(HexadecimalEncoding.FromHex(getName(s, i + 16)));
             return certNames;
         }
-        
-        // TODO: Parse CSR options --- For dynamic mapping
-        /*
-        public List<string> GetCameraCertKeyTypes(string response)
-        {
-            _logger.MethodEntry(LogLevel.Debug);
-            var xmlResponse = new XmlDocument();
-            xmlResponse.LoadXml(response);
-
-            // Parse raw hex content from the response
-            // There can be multiple <str> nodes; pick the first non-empty one
-            // Parse new lines and spaces for the hex converter
-            // TODO: The below will fail if it's empty
-            var s =
-                xmlResponse.GetElementsByTagName("str")[0].InnerText
-                    .Replace(" ", "")
-                    .Replace("\r", "")
-                    .Replace("\n", "");
-            
-            _logger.LogDebug($"Certificate options raw data: {s}");
-
-            // Convert hex string to byte[]
-            // Record structure starts with 2 bytes representing length of the record, followed by 6 more bytes, then filename, then a zero byte.
-            // Iterate through records by reading length tag, extracting the filename in hex and converting.
-            var certNames = new List<string>();
-            
-            Func<string, int, string> getName = (s, start) => s.Substring(start, s.IndexOf("00", start) - start);
-            
-            for (var i = 0; i < s.Length; i += Convert.ToInt32(s.Substring(i, 4), 16) * 2)
-                certNames.Add(HexadecimalEncoding.FromHex(getName(s, i + 16)));
-            
-            return certNames;
-        }*/
 
         public Dictionary<string, string> ParseStringListResponse(string response)
         {

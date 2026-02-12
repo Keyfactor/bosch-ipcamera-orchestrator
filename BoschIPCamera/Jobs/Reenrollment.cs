@@ -235,7 +235,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var requiredField = jobProperties[fieldName];
                 if (requiredField != null)
                 {
-                    _logger.LogTrace($"Required field '{fieldName}' found with value '{requiredField}");
+                    _logger.LogTrace($"Required field '{fieldName}' found with value '{requiredField}'");
                     return requiredField;
                 }
                 else
@@ -264,6 +264,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var splitSubjectElement = subjectElement.Split('=');
                 var name = splitSubjectElement[0].Trim();
                 var value = splitSubjectElement[1].Trim();
+                
                 _logger.LogTrace($"Adding subject element: '{name}' with value '{value}'");
                 csrSubject.Add(name, value);
             }
