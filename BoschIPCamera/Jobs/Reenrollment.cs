@@ -1,4 +1,4 @@
-﻿// Copyright 2023 Keyfactor
+﻿// Copyright 2026 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -61,7 +61,6 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 string returnCode;
                 string errorMessage;
                 string cameraUrl = jobConfiguration.CertificateStoreDetails.ClientMachine;
-
                 // delete existing certificate if overwriting
                 if (overwrite)
                 {
@@ -89,7 +88,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 _logger.LogDebug($"Mapped Key Type: {keyEnum.ToReadableText()}");
                 if (keyEnum == Constants.CertificateKeyType.Unknown)
                 {
-                    errorMessage = $"The requested enrollment key algorithm '{keyAlgorithm}' and '{keySize}' is Unknown and cannot be used to create a CSR.";
+                    errorMessage = $"The requested enrollment key algorithm '{keyAlgorithm}' and key size '{keySize}' is Unknown and cannot be used to create a CSR.";
                     _logger.LogError(errorMessage);
                     return new JobResult
                     {
@@ -124,7 +123,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 {
                     // error downloaded, no CSR present
                     // likely due to existing cert that was not marked to ovewrite (delete)
-                    errorMessage = $"Error retrieving CSR from camera {cameraUrl} - got response: {csr}";
+                    errorMessage = $"Error retrieving CSR from camera {cameraUrl} - got response: {csr}. " +
+                                   $"This could mean the requested enrollment key algorithm '{keyAlgorithm}' and key size '{keySize}' is not supported on this specific device.";
                     _logger.LogError(errorMessage);
                     return new JobResult
                     {
