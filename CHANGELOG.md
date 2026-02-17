@@ -1,3 +1,6 @@
+1.2.0
+- Support for additional ODKG key algorithms and sizes
+
 1.1.2
 - Update doc screenshots
 

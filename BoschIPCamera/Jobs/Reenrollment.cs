@@ -1,4 +1,4 @@
-﻿// Copyright 2023 Keyfactor
+﻿// Copyright 2026 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,11 +55,12 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 bool overwrite = (bool) GetRequiredReenrollmentField(jobConfiguration.JobProperties, "Overwrite");
                 string csrInput = GetRequiredReenrollmentField(jobConfiguration.JobProperties, "subjectText").ToString();
                 string certUsage = GetRequiredReenrollmentField(jobConfiguration.JobProperties, "CertificateUsage").ToString();
+                string keyAlgorithm = GetRequiredReenrollmentField(jobConfiguration.JobProperties,"keyType").ToString();
+                string keySize = GetRequiredReenrollmentField(jobConfiguration.JobProperties,"keySize").ToString();
 
                 string returnCode;
                 string errorMessage;
                 string cameraUrl = jobConfiguration.CertificateStoreDetails.ClientMachine;
-
                 // delete existing certificate if overwriting
                 if (overwrite)
                 {
@@ -80,9 +81,25 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
                 // setup the CSR details
                 var csrSubject = SetupCsrSubject(csrInput);
+                
+                // map the key type and key size from the job properties to a corresponding key type available on the device
+                Constants.CertificateKeyType keyEnum = Constants.MapKeyType(keyAlgorithm,keySize);
+                
+                _logger.LogDebug($"Mapped Key Type: {keyEnum.ToReadableText()}");
+                if (keyEnum == Constants.CertificateKeyType.Unknown)
+                {
+                    errorMessage = $"The requested enrollment key algorithm '{keyAlgorithm}' and key size '{keySize}' is Unknown and cannot be used to create a CSR.";
+                    _logger.LogError(errorMessage);
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = errorMessage
+                    };
+                }
 
                 //generate the CSR on the camera
-                returnCode = client.CertCreate(csrSubject, certName);
+                returnCode = client.CertCreate(csrSubject, certName, keyEnum);
 
                 if (returnCode != "pass")
                 {
@@ -106,7 +123,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 {
                     // error downloaded, no CSR present
                     // likely due to existing cert that was not marked to ovewrite (delete)
-                    errorMessage = $"Error retrieving CSR from camera {cameraUrl} - got response: {csr}";
+                    errorMessage = $"Error retrieving CSR from camera {cameraUrl} - got response: {csr}. " +
+                                   $"This could mean the requested enrollment key algorithm '{keyAlgorithm}' and key size '{keySize}' is not supported on this specific device.";
                     _logger.LogError(errorMessage);
                     return new JobResult
                     {
@@ -217,7 +235,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var requiredField = jobProperties[fieldName];
                 if (requiredField != null)
                 {
-                    _logger.LogTrace($"Required field '{fieldName}' found with value '{requiredField}");
+                    _logger.LogTrace($"Required field '{fieldName}' found with value '{requiredField}'");
                     return requiredField;
                 }
                 else
@@ -246,6 +264,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var splitSubjectElement = subjectElement.Split('=');
                 var name = splitSubjectElement[0].Trim();
                 var value = splitSubjectElement[1].Trim();
+                
                 _logger.LogTrace($"Adding subject element: '{name}' with value '{value}'");
                 csrSubject.Add(name, value);
             }
