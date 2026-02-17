@@ -1,4 +1,4 @@
-﻿// Copyright 2023 Keyfactor
+﻿// Copyright 2026 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,6 +24,15 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             TLS_DATE_Client // 0000 0002
         }
 
+        public enum CertificateKeyType
+        {
+            Unknown,
+            RSA1024,    // 0000 0000
+            RSA2048,    // 0000 0001
+            ECC256,     // 0000 0002
+            RSA4096     // 0000 0003
+        }
+
         public static CertificateUsage ParseCertificateUsage(string usageText)
         {
             switch (usageText)
@@ -43,7 +52,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                     return CertificateUsage.None;
             }
         }
-
+        
         public static string ToReadableText(this CertificateUsage usage)
         {
             switch (usage)
@@ -75,6 +84,72 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                     return "";
             }
         }
+        
+        /// <summary>
+        /// Maps the Keyfactor Command-provided key algorithm and size to the equivalent
+        /// CertificateKeyType enum.
+        /// ** NOTE: These values may need updated depending on the target camera OS.
+        /// </summary>
+        /// <param name="keyAlgorithm">i.e. RSA, ECP</param>
+        /// <param name="keySize">i.e. 2048, 256</param>
+        /// <returns>Enum representation of the [key algorithm]-[key size] the device API can interpret</returns>
+        public static CertificateKeyType MapKeyType(string keyAlgorithm, string keySize)
+        {
+            return keyAlgorithm switch
+            {
+                "RSA" when keySize == "1024" => CertificateKeyType.RSA1024,
+                "RSA" when keySize == "2048" => CertificateKeyType.RSA2048,
+                "ECDSA" when keySize == "256" => CertificateKeyType.ECC256,
+                "RSA" when keySize == "4096" => CertificateKeyType.RSA4096,
+                _ => CertificateKeyType.Unknown
+            };
+        }
+        
+        /// <summary>
+        /// Maps the CertificateKeyType enumeration to a human-readable string representation
+        /// of the key algorithm and size.
+        /// ** NOTE: These values may need updated depending on the target camera OS.
+        /// </summary>
+        public static string ToReadableText(this CertificateKeyType keyType)
+        {
+            switch (keyType)
+            {
+                case CertificateKeyType.RSA1024:
+                    return "RSA 1024";
+                case CertificateKeyType.RSA2048:
+                    return "RSA 2048";
+                case CertificateKeyType.ECC256:
+                    return "Elliptic Curve P256";
+                case CertificateKeyType.RSA4096:
+                    return "RSA 4096";
+                case CertificateKeyType.Unknown:
+                    return "Unknown";
+                default:
+                    return "";
+            }
+        }
+        
+        /// <summary>
+        /// Maps the CertificateKeyType enumeration to the 8-digit hex code that the device can intepret.
+        /// ** NOTE: These values may need updated depending on the target camera OS.
+        /// </summary>
+        public static string ToKeyTypeCode(this CertificateKeyType keyType)
+        {
+            switch (keyType)
+            {
+                case CertificateKeyType.RSA1024:
+                    return "00000000";
+                case CertificateKeyType.RSA2048:
+                    return "00000001";
+                case CertificateKeyType.ECC256:
+                    return "00000002";
+                case CertificateKeyType.RSA4096:
+                    return "00000003";
+                case CertificateKeyType.Unknown:
+                default:
+                    return "";
+            }
+        }
 
         public static class API
         {
@@ -84,6 +159,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 public static string CERTIFICATE_LIST = "0x0BEB";
                 public static string CERTIFICATE_REQUEST = "0x0BEC";
                 public static string CERTIFICATE_USAGE = "0x0BF2";
+                public static string CERTIFICATE_OPTIONS = "0x0BED";
                 public static string EAP_ENABLE = "0x09EB";
                 public static string BOARD_RESET = "0x0811";
             }
