@@ -61,21 +61,49 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 string returnCode;
                 string errorMessage;
                 string cameraUrl = jobConfiguration.CertificateStoreDetails.ClientMachine;
-                // delete existing certificate if overwriting
-                if (overwrite)
+                bool oldCertExists = false;
+                
+                // get the existing certificate name associated with the supplied cert usage
+                Constants.CertificateUsage certUsageEnum = Constants.ParseCertificateUsage(certUsage);
+                string oldCertName = client.GetCertWithUsage(certUsageEnum);
+                if(!string.IsNullOrEmpty(oldCertName))
                 {
-                    returnCode = client.DeleteCertByName(certName);
-
-                    if (returnCode != "pass")
+                    oldCertExists = true;
+                    _logger.LogDebug($"Found Existing cert name '{oldCertName}' with certificate usage '{certUsage}'");
+                    
+                    // compare the old certificate name with the new certificate name ---
+                    // if the names are the same, append a reserved time-based suffix to the end of the name
+                    // this new name [CertA_Timestamp] will be used to create the new cert
+                    if (oldCertName.Equals(certName, StringComparison.InvariantCultureIgnoreCase))
                     {
-                        errorMessage = $"Error deleting existing certificate {certName} on camera {cameraUrl} with error code {returnCode}";
-                        _logger.LogError(errorMessage);
-                        return new JobResult
+                        // check to see if the old cert name had a previously appended timestamp
+                        // EDGE CASE: Cert name bound to usage is known and used to schedule an ODKG job
+                        certName = Constants.CertName.CreateUniqueCertName(certName);
+                        _logger.LogDebug($"Name for new certificate has been updated to '{certName}' to ensure uniqueness");
+                    }
+                }
+                else
+                {
+                    _logger.LogDebug($"No existing certificate found with certificate usage '{certUsage}'");
+                    
+                    // if overwrite is checked, delete the existing certificate (if one exists)
+                    // this is done to avoid errors generating a CSR with a name that is already in use;
+                    // since the existing certificate is not currently bound, this will not cause an outage
+                    if (overwrite)
+                    {
+                        returnCode = client.DeleteCertByName(certName);
+
+                        if (returnCode != "pass")
                         {
-                            Result = OrchestratorJobStatusJobResult.Failure,
-                            JobHistoryId = jobConfiguration.JobHistoryId,
-                            FailureMessage = errorMessage
-                        };
+                            errorMessage = $"Error deleting existing certificate {certName} on camera {cameraUrl} with error code {returnCode}";
+                            _logger.LogError(errorMessage);
+                            return new JobResult
+                            {
+                                Result = OrchestratorJobStatusJobResult.Failure,
+                                JobHistoryId = jobConfiguration.JobHistoryId,
+                                FailureMessage = errorMessage
+                            };
+                        }
                     }
                 }
 
@@ -124,7 +152,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                     // error downloaded, no CSR present
                     // likely due to existing cert that was not marked to ovewrite (delete)
                     errorMessage = $"Error retrieving CSR from camera {cameraUrl} - got response: {csr}. " +
-                                   $"This could mean the requested enrollment key algorithm '{keyAlgorithm}' and key size '{keySize}' is not supported on this specific device.";
+                                   $"Possible reasons for error --- The requested enrollment key algorithm '{keyAlgorithm}' and key size '{keySize}' is not supported on this specific device; " +
+                                   $"The 'Name' provided for the new certificate already exists on the camera and Overwrite was not checked.";
                     _logger.LogError(errorMessage);
                     return new JobResult
                     {
@@ -190,6 +219,24 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                         JobHistoryId = jobConfiguration.JobHistoryId,
                         FailureMessage = errorMessage
                     };
+                }
+                
+                // delete existing certificate if overwriting and an existing certificate was previously bound to the cert usage
+                if (overwrite && oldCertExists)
+                {
+                    returnCode = client.DeleteCertByName(oldCertName);
+
+                    if (returnCode != "pass")
+                    {
+                        errorMessage = $"Error deleting existing certificate {oldCertName} on camera {cameraUrl} with error code {returnCode}";
+                        _logger.LogError(errorMessage);
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = jobConfiguration.JobHistoryId,
+                            FailureMessage = errorMessage
+                        };
+                    }
                 }
 
                 //reboot the camera

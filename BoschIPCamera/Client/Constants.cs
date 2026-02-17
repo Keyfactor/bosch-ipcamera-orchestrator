@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
+using System.Globalization;
+using System.Text.RegularExpressions;
+
 namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 {
     public static class Constants
@@ -150,7 +154,32 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                     return "";
             }
         }
+        
+        public static class CertName
+        {
+            /// <summary>
+            /// Returns a UTC-based suffix, i.e. "2602171544"
+            /// </summary>
+            public static string GetUtcSuffix() =>
+                DateTime.UtcNow.ToString("yyMMddHHmm", CultureInfo.InvariantCulture);
 
+            /// <summary>
+            /// Creates a unique certificate name by appending ['_' + Utc DateTime suffix] to the end of the user-supplied certificate name.
+            /// Example: "_2602171544"
+            /// </summary>
+            public static string CreateUniqueCertName(string certName)
+            {
+                Regex rgx = new Regex(@"_[0-9]{10}$",RegexOptions.CultureInvariant);
+                var m = Regex.Match(certName,@"_[0-9]{10}$");
+                if (m.Success)
+                {
+                    return certName.Remove(m.Index, m.Length) + "_" + GetUtcSuffix();
+                }
+
+                return certName + "_" + GetUtcSuffix();
+            }
+        }
+        
         public static class API
         {
             public static class Endpoints

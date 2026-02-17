@@ -427,8 +427,11 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         }
 
         // get certs with usage
-        private string GetCertWithUsage(Constants.CertificateUsage usage)
+        public string GetCertWithUsage(Constants.CertificateUsage usage)
         {
+            _logger.MethodEntry(LogLevel.Debug);
+            _logger.LogTrace($"Get cert with usage '{usage.ToReadableText()}' for camera " + _cameraUrl);
+            
             var source = new CancellationTokenSource();
             var token = source.Token;
 
