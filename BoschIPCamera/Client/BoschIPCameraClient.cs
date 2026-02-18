@@ -1,4 +1,4 @@
-﻿// Copyright 2023 Keyfactor
+﻿// Copyright 2026 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -100,7 +100,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             return files;
         }
 
-        public string CertCreate(Dictionary<string, string> subject, string certificateName)
+        public string CertCreate(Dictionary<string, string> subject, string certificateName, Constants.CertificateKeyType keyEnum)
         {
             _logger.MethodEntry(LogLevel.Debug);
             try
@@ -108,9 +108,12 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 var myId = HexadecimalEncoding.ToHexNoPadding(certificateName);
                 var payload = $"{HexadecimalEncoding.ToHexWithPrefix(certificateName, 4, '0')}0000{myId}";
 
+                // get the 8-digit hex code that corresponds to the correct key type
+                string keyCode = keyEnum.ToKeyTypeCode();
+                
                 // RAW HEX: "length" + "tag" + "content"
                 // length is full byte count of header (length + tag) + content
-                var keyType = "0008" + "0001" + "00000001";
+                var keyType = "0008" + "0001" + keyCode;
                 var requesttype = "0008" + "0002" + "00000000";
 
                 payload += keyType;
@@ -118,6 +121,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
                 // CN is expected
                 var myCommon = HexadecimalEncoding.ToHexWithPadding(subject["CN"]);
+                _logger.LogTrace($"Encoding CN '{subject["CN"]}' into camera payload");
                 payload += $"{HexadecimalEncoding.ToHexStringLengthWithPadding(subject["CN"], 4, '0')}0005{myCommon}";
 
                 if (subject.ContainsKey("O"))
@@ -423,8 +427,11 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         }
 
         // get certs with usage
-        private string GetCertWithUsage(Constants.CertificateUsage usage)
+        public string GetCertWithUsage(Constants.CertificateUsage usage)
         {
+            _logger.MethodEntry(LogLevel.Debug);
+            _logger.LogTrace($"Get cert with usage '{usage.ToReadableText()}' for camera " + _cameraUrl);
+            
             var source = new CancellationTokenSource();
             var token = source.Token;
 

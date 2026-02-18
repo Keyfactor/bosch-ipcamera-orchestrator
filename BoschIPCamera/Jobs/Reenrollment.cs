@@ -1,4 +1,4 @@
-﻿// Copyright 2023 Keyfactor
+﻿// Copyright 2026 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,34 +55,80 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 bool overwrite = (bool) GetRequiredReenrollmentField(jobConfiguration.JobProperties, "Overwrite");
                 string csrInput = GetRequiredReenrollmentField(jobConfiguration.JobProperties, "subjectText").ToString();
                 string certUsage = GetRequiredReenrollmentField(jobConfiguration.JobProperties, "CertificateUsage").ToString();
+                string keyAlgorithm = GetRequiredReenrollmentField(jobConfiguration.JobProperties,"keyType").ToString();
+                string keySize = GetRequiredReenrollmentField(jobConfiguration.JobProperties,"keySize").ToString();
 
                 string returnCode;
                 string errorMessage;
                 string cameraUrl = jobConfiguration.CertificateStoreDetails.ClientMachine;
-
-                // delete existing certificate if overwriting
-                if (overwrite)
+                bool oldCertExists = false;
+                
+                // get the existing certificate name associated with the supplied cert usage
+                Constants.CertificateUsage certUsageEnum = Constants.ParseCertificateUsage(certUsage);
+                string oldCertName = client.GetCertWithUsage(certUsageEnum);
+                if(!string.IsNullOrEmpty(oldCertName))
                 {
-                    returnCode = client.DeleteCertByName(certName);
-
-                    if (returnCode != "pass")
+                    oldCertExists = true;
+                    _logger.LogDebug($"Found Existing cert name '{oldCertName}' with certificate usage '{certUsage}'");
+                    
+                    // compare the old certificate name with the new certificate name ---
+                    // 1) if the names are the same, append a reserved time-based suffix to the end of the name
+                    // this new name [CertA_Timestamp] will be used to create the new cert
+                    // OR
+                    // 2) EDGE CASE: if the old certificate name currently tied to the cert usage does NOT match the new certificate name,
+                    // also create a new name [CertB_Timestamp] for the new cert in case the user-supplied cert name is already
+                    // associated with an existing certificate that is NOT bound to a cert usage
+                    certName = Constants.CertName.CreateUniqueCertName(certName);
+                    _logger.LogDebug($"Name for new certificate has been updated to '{certName}' to ensure uniqueness");
+                   
+                    
+                }
+                else
+                {
+                    _logger.LogDebug($"No existing certificate found with certificate usage '{certUsage}'");
+                    
+                    // if overwrite is checked, delete the existing certificate (if one exists)
+                    // this is done to avoid errors generating a CSR with a name that is already in use;
+                    // since the existing certificate is not currently bound, this will not cause an outage
+                    if (overwrite)
                     {
-                        errorMessage = $"Error deleting existing certificate {certName} on camera {cameraUrl} with error code {returnCode}";
-                        _logger.LogError(errorMessage);
-                        return new JobResult
+                        returnCode = client.DeleteCertByName(certName);
+
+                        if (returnCode != "pass")
                         {
-                            Result = OrchestratorJobStatusJobResult.Failure,
-                            JobHistoryId = jobConfiguration.JobHistoryId,
-                            FailureMessage = errorMessage
-                        };
+                            errorMessage = $"Error deleting existing certificate {certName} on camera {cameraUrl} with error code {returnCode}";
+                            _logger.LogError(errorMessage);
+                            return new JobResult
+                            {
+                                Result = OrchestratorJobStatusJobResult.Failure,
+                                JobHistoryId = jobConfiguration.JobHistoryId,
+                                FailureMessage = errorMessage
+                            };
+                        }
                     }
                 }
 
                 // setup the CSR details
                 var csrSubject = SetupCsrSubject(csrInput);
+                
+                // map the key type and key size from the job properties to a corresponding key type available on the device
+                Constants.CertificateKeyType keyEnum = Constants.MapKeyType(keyAlgorithm,keySize);
+                
+                _logger.LogDebug($"Mapped Key Type: {keyEnum.ToReadableText()}");
+                if (keyEnum == Constants.CertificateKeyType.Unknown)
+                {
+                    errorMessage = $"The requested enrollment key algorithm '{keyAlgorithm}' and key size '{keySize}' is Unknown and cannot be used to create a CSR.";
+                    _logger.LogError(errorMessage);
+                    return new JobResult
+                    {
+                        Result = OrchestratorJobStatusJobResult.Failure,
+                        JobHistoryId = jobConfiguration.JobHistoryId,
+                        FailureMessage = errorMessage
+                    };
+                }
 
                 //generate the CSR on the camera
-                returnCode = client.CertCreate(csrSubject, certName);
+                returnCode = client.CertCreate(csrSubject, certName, keyEnum);
 
                 if (returnCode != "pass")
                 {
@@ -106,7 +152,9 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 {
                     // error downloaded, no CSR present
                     // likely due to existing cert that was not marked to ovewrite (delete)
-                    errorMessage = $"Error retrieving CSR from camera {cameraUrl} - got response: {csr}";
+                    errorMessage = $"Error retrieving CSR from camera {cameraUrl} - got response: {csr}. " +
+                                   $"Possible reasons for error --- The requested enrollment key algorithm '{keyAlgorithm}' and key size '{keySize}' is not supported on this specific device; " +
+                                   $"The 'Name' provided for the new certificate already exists on the camera and Overwrite was not checked.";
                     _logger.LogError(errorMessage);
                     return new JobResult
                     {
@@ -173,6 +221,24 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                         FailureMessage = errorMessage
                     };
                 }
+                
+                // delete existing certificate if overwriting and an existing certificate was previously bound to the cert usage
+                if (overwrite && oldCertExists)
+                {
+                    returnCode = client.DeleteCertByName(oldCertName);
+
+                    if (returnCode != "pass")
+                    {
+                        errorMessage = $"Error deleting existing certificate {oldCertName} on camera {cameraUrl} with error code {returnCode}";
+                        _logger.LogError(errorMessage);
+                        return new JobResult
+                        {
+                            Result = OrchestratorJobStatusJobResult.Failure,
+                            JobHistoryId = jobConfiguration.JobHistoryId,
+                            FailureMessage = errorMessage
+                        };
+                    }
+                }
 
                 //reboot the camera
                 client.RebootCamera();
@@ -217,7 +283,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var requiredField = jobProperties[fieldName];
                 if (requiredField != null)
                 {
-                    _logger.LogTrace($"Required field '{fieldName}' found with value '{requiredField}");
+                    _logger.LogTrace($"Required field '{fieldName}' found with value '{requiredField}'");
                     return requiredField;
                 }
                 else
@@ -246,6 +312,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                 var splitSubjectElement = subjectElement.Split('=');
                 var name = splitSubjectElement[0].Trim();
                 var value = splitSubjectElement[1].Trim();
+                
                 _logger.LogTrace($"Adding subject element: '{name}' with value '{value}'");
                 csrSubject.Add(name, value);
             }
