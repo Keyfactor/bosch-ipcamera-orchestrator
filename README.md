@@ -357,10 +357,18 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 **Reenrollment**
 
-**Important!** When using Reenrollment, the subject needs to include the Camera's serial number as an element. The Camera automatically adds this to the CSR it generates, and Keyfactor will not enroll the CSR unless it is included.
-For example, with a serial number of '1234' and a desired subject of CN=mycert, the Subject entered for a reenrollment should read:
-Subject:  `SERIALNUMBER=1234,CN=mycert`
-The serial number is entered as the Store Path on the Certificate Store, and should be copied and entered as mentioned when running a reenrollment job.
+> [!IMPORTANT]
+> The Bosch camera requires certificate 'Name' to be unique. 
+> To avoid deleting an in-use certificate prior to its replacement with a like-named certificate and causing a brief outage during the transition,
+> the integration will generate a unique name for the certificate if needed.
+> The pattern used to generate a unique name will be reserved. 
+> Certificate name will be appended with the string "_yyMMddHHmm" using the current UTC date and time.
+
+> [!IMPORTANT] 
+> When using Reenrollment, the subject needs to include the Camera's serial number as an element. The Camera automatically adds this to the CSR it generates, and Keyfactor will not enroll the CSR unless it is included.
+> For example, with a serial number of '1234' and a desired subject of CN=mycert, the Subject entered for a reenrollment should read:
+> Subject:  `SERIALNUMBER=1234,CN=mycert`
+> The serial number is entered as the Store Path on the Certificate Store, and should be copied and entered as mentioned when running a reenrollment job.
 
 | Reenrollment Field | Value | Description |
 |-|-|-|
