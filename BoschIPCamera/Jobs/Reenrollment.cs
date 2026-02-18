@@ -72,15 +72,16 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
                     _logger.LogDebug($"Found Existing cert name '{oldCertName}' with certificate usage '{certUsage}'");
                     
                     // compare the old certificate name with the new certificate name ---
-                    // if the names are the same, append a reserved time-based suffix to the end of the name
+                    // 1) if the names are the same, append a reserved time-based suffix to the end of the name
                     // this new name [CertA_Timestamp] will be used to create the new cert
-                    if (oldCertName.Equals(certName, StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        // check to see if the old cert name had a previously appended timestamp
-                        // EDGE CASE: Cert name bound to usage is known and used to schedule an ODKG job
-                        certName = Constants.CertName.CreateUniqueCertName(certName);
-                        _logger.LogDebug($"Name for new certificate has been updated to '{certName}' to ensure uniqueness");
-                    }
+                    // OR
+                    // 2) EDGE CASE: if the old certificate name currently tied to the cert usage does NOT match the new certificate name,
+                    // also create a new name [CertB_Timestamp] for the new cert in case the user-supplied cert name is already
+                    // associated with an existing certificate that is NOT bound to a cert usage
+                    certName = Constants.CertName.CreateUniqueCertName(certName);
+                    _logger.LogDebug($"Name for new certificate has been updated to '{certName}' to ensure uniqueness");
+                   
+                    
                 }
                 else
                 {

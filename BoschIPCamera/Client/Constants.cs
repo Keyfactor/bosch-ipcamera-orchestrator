@@ -169,6 +169,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             /// </summary>
             public static string CreateUniqueCertName(string certName)
             {
+                // check to see if the old cert name had a previously appended timestamp
+                // EDGE CASE: Scenario under which this could happen - Cert name bound to usage is known and used to schedule an ODKG job
                 Regex rgx = new Regex(@"_[0-9]{10}$",RegexOptions.CultureInvariant);
                 var m = Regex.Match(certName,@"_[0-9]{10}$");
                 if (m.Success)
