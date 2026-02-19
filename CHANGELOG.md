@@ -1,3 +1,7 @@
+1.2.0
+- Improved ODKG workflow to prevent outages caused by deleting in-use certificate before new one is installed
+- Support for additional ODKG key algorithms and sizes
+
 1.1.2
 - Update doc screenshots
 
