@@ -37,6 +37,18 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             RSA4096     // 0000 0003
         }
 
+        public enum CertificateType
+        {
+            Unknown,
+            TRUSTED_CERTIFICATE,        // 0000 0001 (cert only)
+            CSR,                        // 0000 0002 (CSR only)
+            PRIVATE_KEY,                // 0000 0004 (key only --- rare/usually hidden)
+            ENCRYPTED_PRIVATE_KEY,      // 0000 0008 (encrpyted key only)
+            CERTIFICATE,                // 0000 0005 (cert + key)
+            CSR_KEY,                    // 0000 0006 (CSR + key)
+            ENCRYPTED_PKCS12            // 0000 0080 (encrypted PKCS#12)
+        }
+
         public static CertificateUsage ParseCertificateUsage(string usageText)
         {
             switch (usageText)
@@ -150,6 +162,56 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
                 case CertificateKeyType.RSA4096:
                     return "00000003";
                 case CertificateKeyType.Unknown:
+                default:
+                    return "";
+            }
+        }
+
+        public static CertificateType ParseCertificateType(string typeText)
+        {
+            switch (typeText)
+            {
+                case "0001":
+                    return CertificateType.TRUSTED_CERTIFICATE;
+                case "0002":
+                    return CertificateType.CSR;
+                case "0004":
+                    return CertificateType.PRIVATE_KEY;
+                case "0008":
+                    return CertificateType.ENCRYPTED_PRIVATE_KEY;
+                case "0005":
+                    return CertificateType.CERTIFICATE;
+                case "0006":
+                    return CertificateType.CSR_KEY;
+                case "0080":
+                    return CertificateType.ENCRYPTED_PKCS12;
+                case "":
+                case null:
+                default:
+                    return CertificateType.Unknown;
+            }
+        }
+        
+        public static string ToReadableText(this CertificateType type)
+        {
+            switch (type)
+            {
+                case CertificateType.TRUSTED_CERTIFICATE:
+                    return "Trusted Certificate";
+                case CertificateType.CSR:
+                    return "Signing Request";
+                case CertificateType.PRIVATE_KEY:
+                    return "Private Key";
+                case CertificateType.ENCRYPTED_PRIVATE_KEY:
+                    return "Encrypted Private Key";
+                case CertificateType.CERTIFICATE:
+                    return "Certificate";
+                case CertificateType.CSR_KEY:
+                    return "Signing Request";
+                case CertificateType.ENCRYPTED_PKCS12:
+                    return "Encrypted PKCS#12";
+                case CertificateType.Unknown:
+                    return "Unknown";
                 default:
                     return "";
             }

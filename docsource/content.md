@@ -46,7 +46,18 @@ __Keyfactor Command before version 11__: copy the PowerShell to the ExtensionLib
 __Keyfactor Command version 11+__: upload the script using the API [documented here](https://software.keyfactor.com/Core-OnPrem/v11.5/Content/ReferenceGuide/PowerShellScripts.htm) so it can be used in an Expiration Alert Handler
 
 After installing the PowerShell script, create a collection for each certificate type (or one for all cert types) used on cameras. Create an expiration alert and configure the Event Handler similar to the one below.
-  
+
+**Inventory**
+
+> [!IMPORTANT]
+> Bosch cameras can store different types of data in the certificate store. Some of these types include, but are not limited to, the following:
+> * "Signing requests"
+> * "Private keys"
+> * "Certificate"
+> * "Trusted Certificate"
+>
+> This integration will only retrieve data that are marked as type "Certificate" or "Trusted Certificate".
+
 ##### Event Handler Configuration 
 Parameter Name	|Type           |Value
 ----------------|---------------|------------

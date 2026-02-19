@@ -599,9 +599,32 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             // Record structure starts with 2 bytes representing length of the record, followed by 6 more bytes, then filename, then a zero byte.
             // Iterate through records by reading length tag, extracting the filename in hex and converting.
             var certNames = new List<string>();
-            Func<string, int, string> getName = (s, start) => s.Substring(start, s.IndexOf("00", start) - start);
+            Func<string, int, string> getName = (s1, start) => s1.Substring(start, s1.IndexOf("00", start) - start);
+            
             for (var i = 0; i < s.Length; i += Convert.ToInt32(s.Substring(i, 4), 16) * 2)
-                certNames.Add(HexadecimalEncoding.FromHex(getName(s, i + 16)));
+            {
+                // Bosch cameras have different Certificate Types to identify entities, such as CSRs, private keys, etc.
+                // For any type that is NOT a 'Certificate' or 'Trusted Certificate', do not include in the list  
+                
+                // Get the current record
+                var recordLen = Convert.ToInt32(s.Substring(i, 4), 16) * 2;
+                var record = s.Substring(i, recordLen);
+                
+                // Find the first occurrence of "00080002" which marks the start of the Type field
+                var typeStartIndex = record.IndexOf("00080002", StringComparison.Ordinal);
+                
+                // Read the next 16 digits,and then get the last 4, which will map to the specific Type
+                string type = record.Substring(typeStartIndex, 16).Substring(12, 4);
+                Constants.CertificateType typeEnum = Constants.ParseCertificateType(type);
+                _logger.LogDebug($"Type Bits: {type}");
+                _logger.LogDebug($"Type: {typeEnum.ToReadableText()}");
+
+                if (typeEnum is Constants.CertificateType.CERTIFICATE or Constants.CertificateType.TRUSTED_CERTIFICATE)
+                {
+                    certNames.Add(HexadecimalEncoding.FromHex(getName(s, i + 16)));
+                }
+            }
+
             return certNames;
         }
 
