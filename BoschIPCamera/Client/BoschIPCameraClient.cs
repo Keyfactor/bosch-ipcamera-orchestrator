@@ -184,7 +184,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             );
             var requestUri = $"{_cameraUrl}{api}";
 
-            var cancellationTokenSource = new CancellationTokenSource();
+            using var cancellationTokenSource = new CancellationTokenSource();
             var token = cancellationTokenSource.Token;
 
             _logger.LogTrace($"Sending API request: {requestUri}");
@@ -234,7 +234,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             try
             {
                 _logger.LogTrace("Get Auth call to camera on " + _baseUrl);
-                authRequest.GetResponse();
+                using var response = authRequest.GetResponse();
             }
             catch (Exception e)
             {
@@ -291,7 +291,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         private async Task Download(string certName, string paramString = "")
         {
-            var source = new CancellationTokenSource();
+            using var source = new CancellationTokenSource();
             var token = source.Token;
 
             var cameraUrl = $"{_baseUrl}/cert_download/{certName.Replace(" ", "%20")}.pem{paramString}";
@@ -332,7 +332,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         // onOffSwitch - "0" means off, "1" means on
         private async Task Change8021X(bool onOffSwitch)
         {
-            var source = new CancellationTokenSource();
+            using var source = new CancellationTokenSource();
             var token = source.Token;
 
             var api = Constants.API.BuildRequestUri(
@@ -379,7 +379,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
 
         private async Task Reboot()
         {
-            var source = new CancellationTokenSource();
+            using var source = new CancellationTokenSource();
             var token = source.Token;
 
             var api = Constants.API.BuildRequestUri(
@@ -432,7 +432,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
             _logger.MethodEntry(LogLevel.Debug);
             _logger.LogTrace($"Get cert with usage '{usage.ToReadableText()}' for camera " + _cameraUrl);
             
-            var source = new CancellationTokenSource();
+            using var source = new CancellationTokenSource();
             var token = source.Token;
 
             // payload = length + tag (0) + cert usage starting with 0 bit for end cert
@@ -501,7 +501,7 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Client
         //can be used to reset/clear existing cert usage and to set cert usage on a specific cert
         private async Task SetCertUsage(string payload)
         {
-            var source = new CancellationTokenSource();
+            using var source = new CancellationTokenSource();
             var token = source.Token;
 
             var api = Constants.API.BuildRequestUri(

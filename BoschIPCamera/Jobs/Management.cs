@@ -1,4 +1,4 @@
-﻿// Copyright 2023 Keyfactor
+﻿// Copyright 2026 Keyfactor
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -51,6 +51,10 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
 
         public JobResult removeCert(ManagementJobConfiguration jobConfiguration)
         {
+            _logger.MethodEntry(LogLevel.Debug);
+            _logger.LogTrace(
+                $"Begin Management for Client Machine {jobConfiguration.CertificateStoreDetails.ClientMachine}...");
+            
             _logger.LogTrace($"Management Config {JsonConvert.SerializeObject(jobConfiguration)}");
             BoschIpCameraClient client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 

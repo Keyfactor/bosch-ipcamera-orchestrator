@@ -48,6 +48,8 @@ namespace Keyfactor.Extensions.Orchestrator.BoschIPCamera.Jobs
             try
             {
                 _logger.MethodEntry(LogLevel.Debug);
+                _logger.LogTrace(
+                    $"Begin Reenrollment for Client Machine {jobConfiguration.CertificateStoreDetails.ClientMachine}...");
 
                 var client = new BoschIpCameraClient(jobConfiguration, jobConfiguration.CertificateStoreDetails, _pam, _logger);
 
