@@ -1,3 +1,9 @@
+1.2.0
+- Support for additional ODKG key algorithms and sizes
+- Improved ODKG workflow to prevent outages caused by deleting in-use certificate before new one is installed
+- Update Inventory Job to filter out non-certificate types
+- Addressed memory leak potential (CWE-404)
+
 1.1.2
 - Update doc screenshots
 

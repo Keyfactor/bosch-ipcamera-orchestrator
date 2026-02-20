@@ -12,10 +12,18 @@ The Bosch IP Camera Orchestrator remotely manages certificates on the camera.
 
 **Reenrollment**
 
-**Important!** When using Reenrollment, the subject needs to include the Camera's serial number as an element. The Camera automatically adds this to the CSR it generates, and Keyfactor will not enroll the CSR unless it is included.
-For example, with a serial number of '1234' and a desired subject of CN=mycert, the Subject entered for a reenrollment should read:
-Subject:  `SERIALNUMBER=1234,CN=mycert`
-The serial number is entered as the Store Path on the Certificate Store, and should be copied and entered as mentioned when running a reenrollment job.
+> [!IMPORTANT]
+> The Bosch camera requires certificate 'Name' to be unique. 
+> To avoid deleting an in-use certificate prior to its replacement with a like-named certificate and causing a brief outage during the transition,
+> the integration will generate a unique name for the certificate if needed.
+> The pattern used to generate a unique name will be reserved. 
+> Certificate name will be appended with the string "_yyMMddHHmm" using the current UTC date and time.
+
+> [!IMPORTANT] 
+> When using Reenrollment, the subject needs to include the Camera's serial number as an element. The Camera automatically adds this to the CSR it generates, and Keyfactor will not enroll the CSR unless it is included.
+> For example, with a serial number of '1234' and a desired subject of CN=mycert, the Subject entered for a reenrollment should read:
+> Subject:  `SERIALNUMBER=1234,CN=mycert`
+> The serial number is entered as the Store Path on the Certificate Store, and should be copied and entered as mentioned when running a reenrollment job.
 
 | Reenrollment Field | Value | Description |
 |-|-|-|
@@ -38,7 +46,18 @@ __Keyfactor Command before version 11__: copy the PowerShell to the ExtensionLib
 __Keyfactor Command version 11+__: upload the script using the API [documented here](https://software.keyfactor.com/Core-OnPrem/v11.5/Content/ReferenceGuide/PowerShellScripts.htm) so it can be used in an Expiration Alert Handler
 
 After installing the PowerShell script, create a collection for each certificate type (or one for all cert types) used on cameras. Create an expiration alert and configure the Event Handler similar to the one below.
-  
+
+**Inventory**
+
+> [!IMPORTANT]
+> Bosch cameras can store different types of data in the certificate store. Some of these types include, but are not limited to, the following:
+> * "Signing requests"
+> * "Private keys"
+> * "Certificate"
+> * "Trusted Certificate"
+>
+> This integration will only retrieve data that are marked as type "Certificate" or "Trusted Certificate".
+
 ##### Event Handler Configuration 
 Parameter Name	|Type           |Value
 ----------------|---------------|------------
