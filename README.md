@@ -153,6 +153,37 @@ the Keyfactor Command Portal
 
    ![BoschIPCamera Custom Fields Tab](docsource/images/BoschIPCamera-custom-fields-store-type-dialog.png)
 
+
+   ###### Server Username
+   Enter the username of the configured "service" user on the camera
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+
+
+   ###### Server Password
+   Enter the password of the configured "service" user on the camera
+
+
+   > [!IMPORTANT]
+   > This field is created by the `Needs Server` on the Basic tab, do not create this field manually.
+
+
+
+
+   ###### Use SSL
+   Select True or False depending on if SSL (HTTPS) should be used to communicate with the camera.
+
+   ![BoschIPCamera Custom Field - ServerUseSsl](docsource/images/BoschIPCamera-custom-field-ServerUseSsl-dialog.png)
+   ![BoschIPCamera Custom Field - ServerUseSsl](docsource/images/BoschIPCamera-custom-field-ServerUseSsl-validation-options-dialog.png)
+
+
+
+
+
    ##### Entry Parameters Tab
 
    | Name | Display Name | Description | Type | Default Value | Entry has a private key | Adding an entry | Removing an entry | Reenrolling an entry |
@@ -165,21 +196,43 @@ the Keyfactor Command Portal
 
    ![BoschIPCamera Entry Parameters Tab](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog.png)
 
+
+   ##### Certificate Usage
+   The Certificate Usage to assign to the cert after upload. Can be left blank to be assigned later.
+
+   ![BoschIPCamera Entry Parameter - CertificateUsage](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-CertificateUsage.png)
+   ![BoschIPCamera Entry Parameter - CertificateUsage](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-CertificateUsage-validation-options.png)
+
+
+   ##### Name (Alias)
+   The certificate Alias, entered again.
+
+   ![BoschIPCamera Entry Parameter - Name](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-Name.png)
+   ![BoschIPCamera Entry Parameter - Name](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-Name-validation-options.png)
+
+
+   ##### Overwrite
+   Select `True` if using an existing Alias name to remove and replace an existing certificate.
+
+   ![BoschIPCamera Entry Parameter - Overwrite](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-Overwrite.png)
+   ![BoschIPCamera Entry Parameter - Overwrite](docsource/images/BoschIPCamera-entry-parameters-store-type-dialog-Overwrite-validation-options.png)
+
+
+
    </details>
 
 ## Installation
 
 1. **Download the latest Bosch IP Camera Universal Orchestrator extension from GitHub.**
 
-    Navigate to the [Bosch IP Camera Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/bosch-ipcamera-orchestrator/releases/latest). Refer to the compatibility matrix below to determine whether the `net6.0` or `net8.0` asset should be downloaded. Then, click the corresponding asset to download the zip archive.
+    Navigate to the [Bosch IP Camera Universal Orchestrator extension GitHub version page](https://github.com/Keyfactor/bosch-ipcamera-orchestrator/releases/latest). Refer to the compatibility matrix below to determine the asset should be downloaded. Then, click the corresponding asset to download the zip archive.
 
    | Universal Orchestrator Version | Latest .NET version installed on the Universal Orchestrator server | `rollForward` condition in `Orchestrator.runtimeconfig.json` | `bosch-ipcamera-orchestrator` .NET version to download |
    | --------- | ----------- | ----------- | ----------- |
    | Older than `11.0.0` | | | `net6.0` |
    | Between `11.0.0` and `11.5.1` (inclusive) | `net6.0` | | `net6.0` |
-   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `Disable` | `net6.0` |
-   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `LatestMajor` | `net8.0` |
-   | `11.6` _and_ newer | `net8.0` | | `net8.0` |
+   | Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `Disable` | `net6.0` || Between `11.0.0` and `11.5.1` (inclusive) | `net8.0` | `LatestMajor` | `net8.0` |
+   | `11.6` _and_ newer | `net8.0` | | `net8.0` | 
 
     Unzip the archive containing extension assemblies to a known location.
 
@@ -304,10 +357,18 @@ Please refer to the **Universal Orchestrator (remote)** usage section ([PAM prov
 
 **Reenrollment**
 
-**Important!** When using Reenrollment, the subject needs to include the Camera's serial number as an element. The Camera automatically adds this to the CSR it generates, and Keyfactor will not enroll the CSR unless it is included.
-For example, with a serial number of '1234' and a desired subject of CN=mycert, the Subject entered for a reenrollment should read:
-Subject:  `SERIALNUMBER=1234,CN=mycert`
-The serial number is entered as the Store Path on the Certificate Store, and should be copied and entered as mentioned when running a reenrollment job.
+> [!IMPORTANT]
+> The Bosch camera requires certificate 'Name' to be unique. 
+> To avoid deleting an in-use certificate prior to its replacement with a like-named certificate and causing a brief outage during the transition,
+> the integration will generate a unique name for the certificate if needed.
+> The pattern used to generate a unique name will be reserved. 
+> Certificate name will be appended with the string "_yyMMddHHmm" using the current UTC date and time.
+
+> [!IMPORTANT] 
+> When using Reenrollment, the subject needs to include the Camera's serial number as an element. The Camera automatically adds this to the CSR it generates, and Keyfactor will not enroll the CSR unless it is included.
+> For example, with a serial number of '1234' and a desired subject of CN=mycert, the Subject entered for a reenrollment should read:
+> Subject:  `SERIALNUMBER=1234,CN=mycert`
+> The serial number is entered as the Store Path on the Certificate Store, and should be copied and entered as mentioned when running a reenrollment job.
 
 | Reenrollment Field | Value | Description |
 |-|-|-|
@@ -331,6 +392,17 @@ __Keyfactor Command before version 11__: copy the PowerShell to the ExtensionLib
 __Keyfactor Command version 11+__: upload the script using the API [documented here](https://software.keyfactor.com/Core-OnPrem/v11.5/Content/ReferenceGuide/PowerShellScripts.htm) so it can be used in an Expiration Alert Handler
 
 After installing the PowerShell script, create a collection for each certificate type (or one for all cert types) used on cameras. Create an expiration alert and configure the Event Handler similar to the one below.
+
+**Inventory**
+
+> [!IMPORTANT]
+> Bosch cameras can store different types of data in the certificate store. Some of these types include, but are not limited to, the following:
+> * "Signing requests"
+> * "Private keys"
+> * "Certificate"
+> * "Trusted Certificate"
+>
+> This integration will only retrieve data that are marked as type "Certificate" or "Trusted Certificate".
 
 ##### Event Handler Configuration
 Parameter Name	|Type           |Value
